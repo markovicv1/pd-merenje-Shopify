@@ -101,7 +101,7 @@ const PDMeasurement = () => {
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 960 } },
         audio: false,
       });
       if (!videoRef.current) return;
@@ -402,9 +402,8 @@ const PDMeasurement = () => {
         }
         .video-container {
           position: relative; border-radius: 16px; overflow: hidden;
-          background: #000; aspect-ratio: 4/3;
+          background: #000; aspect-ratio: 3/4;
         }
-        @media (max-width: 480px) { .video-container { aspect-ratio: 3/4; } }
         video { width: 100%; height: 100%; object-fit: cover; display: block; transform: scaleX(-1); }
         canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
         .loading-spinner {
