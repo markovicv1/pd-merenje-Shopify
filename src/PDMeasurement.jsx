@@ -37,30 +37,21 @@ const PDMeasurement = () => {
       
       try {
         setLoadingStatus('Učitavanje MediaPipe biblioteke...');
-        
-        // Load MediaPipe Vision
-        if (!window.FaceLandmarker) {
-          await new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.js';
-            script.onload = resolve;
-            script.onerror = () => reject(new Error('Nije moguće učitati MediaPipe'));
-            document.head.appendChild(script);
-          });
-        }
+
+        // Dynamic import — vision_bundle.js is an ES module in newer versions
+        const mp = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.js');
+        const FaceLandmarker = mp.FaceLandmarker;
+        const FilesetResolver = mp.FilesetResolver;
 
         setLoadingStatus('Inicijalizacija Face Mesh modela...');
-        
-        // Wait for the module to be available
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        const vision = await window.FilesetResolver.forVisionTasks(
+
+        const vision = await FilesetResolver.forVisionTasks(
           'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
         );
 
         setLoadingStatus('Preuzimanje AI modela (~5MB)...');
 
-        const faceLandmarker = await window.FaceLandmarker.createFromOptions(vision, {
+        const faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
           baseOptions: {
             modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
             delegate: 'GPU'
@@ -74,19 +65,20 @@ const PDMeasurement = () => {
         setFaceMesh(faceLandmarker);
         setLoading(false);
         setLoadingStatus('');
-        
+
       } catch (err) {
         console.error('MediaPipe loading error:', err);
-        
+
         // Try CPU fallback
         try {
           setLoadingStatus('Pokušavam CPU režim...');
-          
-          const vision = await window.FilesetResolver.forVisionTasks(
+
+          const mp = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.js');
+          const vision = await mp.FilesetResolver.forVisionTasks(
             'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
           );
 
-          const faceLandmarker = await window.FaceLandmarker.createFromOptions(vision, {
+          const faceLandmarker = await mp.FaceLandmarker.createFromOptions(vision, {
             baseOptions: {
               modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
               delegate: 'CPU'
