@@ -42,7 +42,7 @@ const PDMeasurement = () => {
         if (!window.FaceLandmarker) {
           await new Promise((resolve, reject) => {
             const script = document.createElement('script');
-            script.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/vision_bundle.min.js';
+            script.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.js';
             script.onload = resolve;
             script.onerror = () => reject(new Error('Nije moguće učitati MediaPipe'));
             document.head.appendChild(script);
@@ -55,7 +55,7 @@ const PDMeasurement = () => {
         await new Promise(resolve => setTimeout(resolve, 500));
         
         const vision = await window.FilesetResolver.forVisionTasks(
-          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/wasm'
+          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
         );
 
         setLoadingStatus('Preuzimanje AI modela (~5MB)...');
@@ -83,7 +83,7 @@ const PDMeasurement = () => {
           setLoadingStatus('Pokušavam CPU režim...');
           
           const vision = await window.FilesetResolver.forVisionTasks(
-            'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/wasm'
+            'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
           );
 
           const faceLandmarker = await window.FaceLandmarker.createFromOptions(vision, {
