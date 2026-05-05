@@ -368,114 +368,111 @@ const PDMeasurement = () => {
     lastTimeRef.current = -1;
   };
 
-  // ── Status helpers ────────────────────────────────────────────────────────
-  const statusConfig = {
-    none:  { color: 'rgba(255,107,107,0.9)', text: '✗ Lice nije pronađeno' },
-    far:   { color: 'rgba(255,193,7,0.9)',   text: '↔ Priđite bliže kameri' },
-    close: { color: 'rgba(255,107,107,0.9)', text: '↔ Odmaknite se malo' },
-    good:  { color: 'rgba(0,212,170,0.9)',   text: '✓ Dobra pozicija' },
-  };
+  // ── Shared styles ─────────────────────────────────────────────────────────
+  const SHARED_CSS = `
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
+    body { background: #0d1117; }
+    .btn-primary {
+      background: #00C8FF; border: none; padding: 16px 24px; border-radius: 50px;
+      color: #000; font-weight: 700; font-size: 16px; cursor: pointer; width: 100%;
+      font-family: inherit; touch-action: manipulation; transition: opacity 0.2s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn-primary:active { opacity: 0.85; }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-secondary {
+      background: transparent; border: 1px solid rgba(255,255,255,0.2);
+      padding: 15px 24px; border-radius: 50px; color: #fff; width: 100%;
+      font-weight: 500; font-size: 15px; cursor: pointer; font-family: inherit;
+      touch-action: manipulation;
+    }
+    .btn-secondary:active { background: rgba(255,255,255,0.05); }
+    .marker {
+      position: absolute; width: 32px; height: 32px;
+      cursor: grab; transform: translate(-50%, -50%);
+      touch-action: none; user-select: none;
+    }
+    .marker:active { cursor: grabbing; }
+    .marker-h, .marker-v { position: absolute; background: currentColor; }
+    .marker-h { width: 100%; height: 2px; top: 50%; left: 0; transform: translateY(-50%); }
+    .marker-v { width: 2px; height: 100%; left: 50%; top: 0; transform: translateX(-50%); }
+    .marker-dot {
+      position: absolute; width: 8px; height: 8px; border-radius: 50%;
+      border: 2px solid currentColor; top: 50%; left: 50%;
+      transform: translate(-50%, -50%); background: transparent;
+    }
+    .loading-spinner {
+      width: 44px; height: 44px;
+      border: 3px solid rgba(255,255,255,0.1); border-top-color: #00C8FF;
+      border-radius: 50%; animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    video { width: 100%; height: 100%; object-fit: cover; display: block; transform: scaleX(-1); }
+    canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+  `;
+
+  // ── Shared header bar ──────────────────────────────────────────────────────
+  const HeaderBar = () => (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.07)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: 8, background: '#161b22',
+          border: '1px solid rgba(255,255,255,0.1)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+        }}>
+          <img
+            src="https://opticarka.com/cdn/shop/t/39/assets/opticarka_logo_over_stream_black.png"
+            alt="" style={{ width: 26, filter: 'invert(1)', opacity: 0.9 }}
+          />
+        </div>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 14, color: '#fff', lineHeight: 1.2 }}>PD Kalkulator</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Optičarka.com</div>
+        </div>
+      </div>
+      <div style={{
+        background: '#00C8FF', color: '#000', fontSize: 12, fontWeight: 700,
+        padding: '5px 12px', borderRadius: 20, letterSpacing: '0.01em',
+      }}>✦ AI Powered</div>
+    </div>
+  );
 
   // ── Render: ADJUST (full-width, breaks out of 500px container) ───────────
   if (step === 'adjust' && snapshotUrl) {
     return (
-      <div style={{
-        minHeight: '100vh', background: '#0a0a0a',
-        fontFamily: '"Space Grotesk", -apple-system, BlinkMacSystemFont, sans-serif',
-        color: '#fff', display: 'flex', flexDirection: 'column',
-      }}>
-        <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
-          * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-          .btn-primary {
-            background: linear-gradient(135deg, #00D4AA 0%, #00A388 100%);
-            border: none; padding: 16px 28px; border-radius: 12px;
-            color: #000; font-weight: 600; font-size: 16px; cursor: pointer;
-            transition: all 0.3s ease; font-family: inherit; touch-action: manipulation;
-          }
-          .btn-primary:active { transform: scale(0.98); }
-          .btn-secondary {
-            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
-            padding: 14px 20px; border-radius: 10px; color: #fff;
-            font-weight: 500; font-size: 15px; cursor: pointer; font-family: inherit;
-            touch-action: manipulation;
-          }
-          .marker {
-            position: absolute; width: 32px; height: 32px;
-            cursor: grab; transform: translate(-50%, -50%);
-            touch-action: none; user-select: none;
-          }
-          .marker:active { cursor: grabbing; }
-          .marker-h, .marker-v { position: absolute; background: currentColor; }
-          .marker-h { width: 100%; height: 2px; top: 50%; left: 0; transform: translateY(-50%); }
-          .marker-v { width: 2px; height: 100%; left: 50%; top: 0; transform: translateX(-50%); }
-          .marker-dot {
-            position: absolute; width: 8px; height: 8px; border-radius: 50%;
-            border: 2px solid currentColor; top: 50%; left: 50%;
-            transform: translate(-50%, -50%); background: transparent;
-          }
-        `}</style>
-
-        {/* Legend bar */}
-        <div style={{
-          padding: '10px 16px', display: 'flex', alignItems: 'center',
-          gap: '16px', background: 'rgba(255,255,255,0.04)',
-          borderBottom: '1px solid rgba(255,255,255,0.08)', fontSize: '12px',
-        }}>
-          <span style={{ color: 'rgba(255,255,255,0.5)' }}>Prevucite markere:</span>
-          <span><span style={{ color: '#FF6B6B', marginRight: 6 }}>━</span>ivice kartice</span>
-          <span><span style={{ color: '#00D4AA', marginRight: 6 }}>━</span>zenice</span>
+      <div style={{ minHeight: '100vh', background: '#0d1117', fontFamily: 'Inter, -apple-system, sans-serif', color: '#fff', display: 'flex', flexDirection: 'column' }}>
+        <style>{SHARED_CSS}</style>
+        <HeaderBar />
+        <div style={{ padding: '8px 16px 6px', display: 'flex', alignItems: 'center', gap: 16, fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
+          <span><span style={{ color: '#FF6B6B' }}>━</span> ivice kartice</span>
+          <span><span style={{ color: '#00C8FF' }}>━</span> zenice</span>
+          <span style={{ marginLeft: 'auto' }}>Prevucite markere</span>
         </div>
-
-        {/* Full-width photo */}
         <div
           ref={adjustRef}
-          onMouseMove={onContainerMove}
-          onMouseUp={onContainerUp}
-          onMouseLeave={onContainerUp}
-          onTouchMove={onContainerMove}
-          onTouchEnd={onContainerUp}
+          onMouseMove={onContainerMove} onMouseUp={onContainerUp} onMouseLeave={onContainerUp}
+          onTouchMove={onContainerMove} onTouchEnd={onContainerUp}
           style={{ position: 'relative', touchAction: 'none', flex: 1 }}
         >
-          <img
-            ref={imgRef}
-            src={snapshotUrl}
-            alt="snapshot"
-            style={{ width: '100%', display: 'block' }}
-            draggable={false}
-          />
-
-          <img
-            src="https://opticarka.com/cdn/shop/t/39/assets/opticarka_logo_over_stream_black.png"
-            alt=""
-            style={{
-              position: 'absolute', top: '10px', left: '10px',
-              width: '110px', pointerEvents: 'none', zIndex: 5,
-              filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.5))',
-            }}
-          />
-
+          <img ref={imgRef} src={snapshotUrl} alt="snapshot" style={{ width: '100%', display: 'block' }} draggable={false} />
+          <img src="https://opticarka.com/cdn/shop/t/39/assets/opticarka_logo_over_stream_black.png" alt=""
+            style={{ position: 'absolute', top: 10, left: 10, width: 100, pointerEvents: 'none', zIndex: 5, filter: 'invert(1) drop-shadow(0 1px 3px rgba(0,0,0,0.8))' }} />
           {cardMarkers.map((m, i) => (
-            <div key={`card-${i}`} className="marker"
-              onMouseDown={e => onMarkerDown('card', i, e)}
-              onTouchStart={e => onMarkerDown('card', i, e)}
-              style={{ left: `${m.x}%`, top: `${m.y}%`, color: '#FF6B6B' }}>
+            <div key={`card-${i}`} className="marker" onMouseDown={e => onMarkerDown('card', i, e)} onTouchStart={e => onMarkerDown('card', i, e)} style={{ left: `${m.x}%`, top: `${m.y}%`, color: '#FF6B6B' }}>
               <div className="marker-h" /><div className="marker-v" /><div className="marker-dot" />
             </div>
           ))}
-
           {pupilMarkers.map((m, i) => (
-            <div key={`pupil-${i}`} className="marker"
-              onMouseDown={e => onMarkerDown('pupil', i, e)}
-              onTouchStart={e => onMarkerDown('pupil', i, e)}
-              style={{ left: `${m.x}%`, top: `${m.y}%`, color: '#00D4AA' }}>
+            <div key={`pupil-${i}`} className="marker" onMouseDown={e => onMarkerDown('pupil', i, e)} onTouchStart={e => onMarkerDown('pupil', i, e)} style={{ left: `${m.x}%`, top: `${m.y}%`, color: '#00C8FF' }}>
               <div className="marker-h" /><div className="marker-v" /><div className="marker-dot" />
             </div>
           ))}
         </div>
-
-        {/* Buttons */}
-        <div style={{ padding: '12px 16px 24px', display: 'flex', gap: '10px' }}>
+        <div style={{ padding: '12px 16px 28px', display: 'flex', gap: 10 }}>
           <button className="btn-secondary" onClick={retryDetect} style={{ flex: 1 }}>Ponovi</button>
           <button className="btn-primary" onClick={calculatePD} style={{ flex: 2 }}>Izračunaj PD</button>
         </div>
@@ -486,184 +483,139 @@ const PDMeasurement = () => {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%)',
-      fontFamily: '"Space Grotesk", -apple-system, BlinkMacSystemFont, sans-serif',
+      minHeight: '100vh', background: '#0d1117',
+      fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
       color: '#fff',
-      padding: '16px',
-      paddingBottom: '40px',
     }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        .glass-card {
-          background: rgba(255,255,255,0.05);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
-          border: 1px solid rgba(255,255,255,0.1);
-          border-radius: 20px;
-          padding: 24px;
-        }
-        .btn-primary {
-          background: linear-gradient(135deg, #00D4AA 0%, #00A388 100%);
-          border: none; padding: 16px 28px; border-radius: 12px;
-          color: #000; font-weight: 600; font-size: 16px; cursor: pointer;
-          transition: all 0.3s ease; font-family: inherit; touch-action: manipulation;
-        }
-        .btn-primary:active { transform: scale(0.98); }
-        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-        .btn-secondary {
-          background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
-          padding: 14px 20px; border-radius: 10px; color: #fff;
-          font-weight: 500; font-size: 15px; cursor: pointer; font-family: inherit;
-          touch-action: manipulation;
-        }
-        .video-container {
-          position: relative; border-radius: 16px; overflow: hidden;
-          background: #000; aspect-ratio: 3/4;
-        }
-        video { width: 100%; height: 100%; object-fit: cover; display: block; transform: scaleX(-1); }
-        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-        .loading-spinner {
-          width: 48px; height: 48px;
-          border: 4px solid rgba(255,255,255,0.1); border-top-color: #00D4AA;
-          border-radius: 50%; animation: spin 1s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .info-box {
-          background: rgba(0,212,170,0.1); border: 1px solid rgba(0,212,170,0.3);
-          border-radius: 12px; padding: 16px;
-        }
-        .marker {
-          position: absolute; width: 32px; height: 32px;
-          cursor: grab; transform: translate(-50%, -50%);
-          touch-action: none; user-select: none;
-        }
-        .marker:active { cursor: grabbing; }
-        .marker-h, .marker-v {
-          position: absolute; background: currentColor;
-        }
-        .marker-h { width: 100%; height: 2px; top: 50%; left: 0; transform: translateY(-50%); }
-        .marker-v { width: 2px; height: 100%; left: 50%; top: 0; transform: translateX(-50%); }
-        .marker-dot {
-          position: absolute; width: 8px; height: 8px; border-radius: 50%;
-          border: 2px solid currentColor; top: 50%; left: 50%;
-          transform: translate(-50%, -50%); background: transparent;
-        }
-      `}</style>
+      <style>{SHARED_CSS}</style>
 
-      <div style={{ maxWidth: '500px', margin: '0 auto' }}>
-
-        {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-          <h1 style={{
-            fontSize: '24px', fontWeight: '700', marginBottom: '4px',
-            background: 'linear-gradient(135deg, #fff 0%, #00D4AA 100%)',
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-          }}>PD Merenje</h1>
-          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', margin: 0 }}>
-            Pupilarna distanca • Optičarka.com
-          </p>
+      {/* Error banner */}
+      {error && (
+        <div style={{
+          background: 'rgba(200,40,40,0.15)', borderBottom: '1px solid rgba(200,40,40,0.3)',
+          padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+        }}>
+          <span style={{ color: '#FF6B6B', fontSize: 14 }}>{error}</span>
+          <button onClick={() => setError(null)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 18, padding: '0 4px' }}>✕</button>
         </div>
+      )}
 
-        {/* Error */}
-        {error && (
-          <div style={{
-            background: 'rgba(255,107,107,0.15)', border: '1px solid rgba(255,107,107,0.4)',
-            borderRadius: '12px', padding: '16px', marginBottom: '20px',
-          }}>
-            <p style={{ color: '#FF6B6B', margin: '0 0 12px 0', fontSize: '14px' }}>{error}</p>
-            <button className="btn-secondary" onClick={() => setError(null)}>OK</button>
-          </div>
-        )}
+      <div style={{ maxWidth: 480, margin: '0 auto', display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
 
-        {/* Loading */}
+        {/* ── LOADING ── */}
         {loading && (
-          <div className="glass-card" style={{ textAlign: 'center', padding: '40px' }}>
-            <div className="loading-spinner" style={{ margin: '0 auto 24px' }} />
-            <p style={{ marginBottom: '8px', fontWeight: '500' }}>Učitavanje AI modela</p>
-            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', margin: 0 }}>
-              {loadingStatus || 'Molimo sačekajte...'}
-            </p>
-          </div>
+          <>
+            <HeaderBar />
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20, padding: 32 }}>
+              <div className="loading-spinner" />
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontWeight: 600, marginBottom: 6 }}>Učitavanje AI modela</div>
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>{loadingStatus || 'Molimo sačekajte...'}</div>
+              </div>
+            </div>
+          </>
         )}
 
         {/* ── INTRO ── */}
         {step === 'intro' && !loading && (
-          <div className="glass-card">
-            <div style={{ textAlign: 'center' }}>
+          <>
+            <HeaderBar />
+            <div style={{ flex: 1, padding: '32px 20px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              {/* Camera icon */}
               <div style={{
-                width: '72px', height: '72px',
-                background: 'linear-gradient(135deg, #00D4AA 0%, #00A388 100%)',
-                borderRadius: '18px', display: 'flex', alignItems: 'center',
-                justifyContent: 'center', margin: '0 auto 20px', fontSize: '32px',
-              }}>👁️</div>
-              <h2 style={{ fontSize: '20px', marginBottom: '12px' }}>Izmerite svoju PD vrednost</h2>
-              <p style={{ color: 'rgba(255,255,255,0.7)', marginBottom: '20px', lineHeight: '1.6', fontSize: '15px' }}>
-                PD (pupilarna distanca) je rastojanje između centara zenica, potrebno za preciznu izradu naočara.
+                width: 80, height: 80, borderRadius: 20, background: '#161b22',
+                border: '1px solid rgba(255,255,255,0.1)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 36, marginBottom: 20,
+              }}>📷</div>
+
+              <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 8, textAlign: 'center' }}>
+                Izmerite <span style={{ color: '#00C8FF' }}>PD</span>
+              </h1>
+              <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, marginBottom: 32, textAlign: 'center' }}>
+                Pupilarna distanca za 30 sekundi
               </p>
-              <div className="info-box" style={{ textAlign: 'left', marginBottom: '24px' }}>
-                <p style={{ fontWeight: '600', marginBottom: '10px', fontSize: '14px' }}>📋 Priprema:</p>
-                <ul style={{ margin: 0, paddingLeft: '18px', color: 'rgba(255,255,255,0.8)', fontSize: '14px', lineHeight: '1.8' }}>
-                  <li>Kreditna/bankovna kartica — držite je pored lica</li>
-                  <li>Dobro osvetljenje (ne pozadinsko)</li>
-                  <li>Skinite naočare ako ih nosite</li>
-                </ul>
+
+              {/* Instruction card */}
+              <div style={{
+                width: '100%', background: '#161b22', borderRadius: 16,
+                border: '1px solid rgba(255,255,255,0.08)', padding: '8px 0', marginBottom: 28,
+              }}>
+                {[
+                  { icon: '💳', text: 'Držite karticu na vrhu nosa ili čela' },
+                  { icon: '👁️', text: 'Gledajte TAČNO u kameru' },
+                  { icon: '🧍', text: 'Mirujte 3 sekunde' },
+                  { icon: '🎯', text: 'Označite ivice kartice' },
+                ].map((item, i) => (
+                  <div key={i} style={{
+                    display: 'flex', alignItems: 'center', gap: 14,
+                    padding: '13px 18px',
+                    borderBottom: i < 3 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                  }}>
+                    <span style={{ fontSize: 20, flexShrink: 0 }}>{item.icon}</span>
+                    <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.85)' }}>{item.text}</span>
+                  </div>
+                ))}
               </div>
+
               <button
                 className="btn-primary"
                 onClick={() => { startCamera(); setStep('detecting'); }}
                 disabled={!faceMesh}
-                style={{ width: '100%' }}
               >
-                {faceMesh ? '📷 Započni merenje' : 'Učitavanje...'}
+                {faceMesh ? (<>📹 Započni merenje</>) : 'Učitavanje...'}
               </button>
             </div>
-          </div>
+
+            {/* Footer */}
+            <div style={{ padding: '0 20px 28px', textAlign: 'center' }}>
+              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginBottom: 4 }}>
+                Na mobilnom: koristite dva prsta za zoom
+              </p>
+              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', fontWeight: 600 }}>
+                Merenje se dešava u vašem browseru, svi podaci ostaju na vašem uređaju
+              </p>
+            </div>
+          </>
         )}
 
         {/* ── DETECTING ── */}
         {step === 'detecting' && (
-          <div className="glass-card" style={{ padding: '16px' }}>
-            <div style={{ marginBottom: '12px' }}>
-              <h2 style={{ fontSize: '17px', marginBottom: '4px' }}>Pozicionirajte lice</h2>
-              <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', margin: 0 }}>
-                Gledajte u kameru. Kartica pored lica, horizontalno.
-              </p>
+          <>
+            <HeaderBar />
+
+            {/* Status badges */}
+            <div style={{ display: 'flex', gap: 8, padding: '10px 16px' }}>
+              {faceStatus === 'far' && (
+                <div style={{ background: 'rgba(180,110,0,0.85)', color: '#fff', fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 20 }}>
+                  ↔ Priđite kameri
+                </div>
+              )}
+              {faceStatus === 'close' && (
+                <div style={{ background: 'rgba(180,40,40,0.85)', color: '#fff', fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 20 }}>
+                  ↔ Odmaknite se malo
+                </div>
+              )}
             </div>
 
-            <div className="video-container">
-              {/* Face guide oval */}
+            {/* Camera */}
+            <div style={{ position: 'relative', background: '#000', aspectRatio: '3/4', overflow: 'hidden', flex: 1 }}>
+              {/* Guide oval */}
               <div style={{
                 position: 'absolute', top: '50%', left: '50%',
                 transform: 'translate(-50%, -52%)',
-                width: '62%', height: '72%',
-                borderRadius: '50%',
-                border: `2px dashed ${faceStatus === 'good' ? 'rgba(0,212,170,0.85)' : 'rgba(255,255,255,0.35)'}`,
-                pointerEvents: 'none', zIndex: 9,
-                transition: 'border-color 0.3s ease',
+                width: '65%', height: '75%', borderRadius: '50%',
+                border: `2.5px dashed ${faceStatus === 'good' ? '#00C8FF' : 'rgba(255,255,255,0.3)'}`,
+                pointerEvents: 'none', zIndex: 9, transition: 'border-color 0.3s ease',
               }} />
-
-              {/* Face status */}
-              <div style={{
-                position: 'absolute', top: 12, left: 12,
-                background: statusConfig[faceStatus]?.color || 'rgba(100,100,100,0.9)',
-                padding: '7px 14px', borderRadius: '20px',
-                fontSize: '13px', fontWeight: '600', zIndex: 10,
-                color: faceStatus === 'far' ? '#000' : '#fff',
-              }}>
-                {statusConfig[faceStatus]?.text || ''}
-              </div>
 
               {/* Countdown */}
               {countdown !== null && (
                 <div style={{
                   position: 'absolute', top: '50%', left: '50%',
                   transform: 'translate(-50%, -50%)',
-                  fontSize: '96px', fontWeight: '900',
-                  color: '#00D4AA', zIndex: 20,
-                  textShadow: '0 0 30px rgba(0,212,170,0.8)',
-                  lineHeight: 1,
+                  fontSize: 96, fontWeight: 900, color: '#00C8FF', zIndex: 20,
+                  textShadow: '0 0 40px rgba(0,200,255,0.9)', lineHeight: 1,
                 }}>
                   {countdown === 0 ? '📸' : countdown}
                 </div>
@@ -672,96 +624,122 @@ const PDMeasurement = () => {
               <video ref={videoRef} playsInline muted />
               <canvas ref={canvasRef} />
 
-              {/* Bottom hint */}
+              {/* Bottom status */}
               <div style={{
-                position: 'absolute', bottom: 12, left: '50%',
-                transform: 'translateX(-50%)',
-                background: 'rgba(0,0,0,0.85)',
-                padding: '10px 18px', borderRadius: '10px',
-                fontSize: '13px', textAlign: 'center',
-                maxWidth: '90%', zIndex: 10,
+                position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)',
+                display: 'flex', alignItems: 'center', gap: 8,
+                background: 'rgba(0,0,0,0.75)', padding: '8px 16px', borderRadius: 20,
+                fontSize: 13, whiteSpace: 'nowrap', zIndex: 10,
               }}>
-                {!faceDetected
-                  ? 'Okrenite lice prema kameri'
-                  : faceStatus === 'far'
-                    ? 'Priđite kameri'
-                    : faceStatus === 'close'
-                      ? 'Odmaknite se malo'
-                      : countdown !== null
-                        ? 'Ostanite mirni...'
-                        : 'Odlično! Ostanite mirni 3 sekunde'}
+                <span style={{
+                  width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                  background: faceStatus === 'good' ? '#00C8FF' : '#EF4444',
+                  boxShadow: faceStatus === 'good' ? '0 0 6px #00C8FF' : '0 0 6px #EF4444',
+                }} />
+                {!faceDetected ? 'Pozicionirajte lice'
+                  : faceStatus === 'far' ? 'Priđite kameri'
+                  : faceStatus === 'close' ? 'Odmaknite se malo'
+                  : countdown !== null ? 'Ostanite mirni...'
+                  : 'Odlično! Ostanite mirni'}
               </div>
+
+              {/* Error badge: face not detected */}
+              {!faceDetected && cameraReady && (
+                <div style={{
+                  position: 'absolute', bottom: 52, left: '50%', transform: 'translateX(-50%)',
+                  background: 'rgba(150,20,20,0.9)', color: '#fff',
+                  fontSize: 13, fontWeight: 600, padding: '7px 16px', borderRadius: 20,
+                  zIndex: 10, whiteSpace: 'nowrap',
+                }}>
+                  ✕ Lice nije detektovano
+                </div>
+              )}
             </div>
 
-            <button className="btn-secondary" onClick={reset} style={{ width: '100%', marginTop: '12px' }}>
-              Otkaži
-            </button>
-          </div>
+            <div style={{ padding: '12px 16px 28px' }}>
+              <button className="btn-secondary" onClick={reset}>Otkaži</button>
+            </div>
+          </>
         )}
-
 
         {/* ── RESULT ── */}
         {step === 'result' && (
-          <div className="glass-card" style={{ textAlign: 'center' }}>
-            <div style={{
-              width: '72px', height: '72px',
-              background: 'linear-gradient(135deg, #00D4AA 0%, #00A388 100%)',
-              borderRadius: '50%', display: 'flex', alignItems: 'center',
-              justifyContent: 'center', margin: '0 auto 20px', fontSize: '32px',
-            }}>✓</div>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '36px 20px 28px' }}>
+            {/* Optičarka logo */}
+            <img
+              src="https://opticarka.com/cdn/shop/t/39/assets/opticarka_logo_over_stream_black.png"
+              alt="optičarka"
+              style={{ width: 160, filter: 'invert(1)', opacity: 0.9, marginBottom: 28 }}
+            />
 
-            <h2 style={{ fontSize: '18px', marginBottom: '4px' }}>Vaša pupilarna distanca</h2>
+            {/* Badge */}
             <div style={{
-              fontSize: '64px', fontWeight: '700',
-              background: 'linear-gradient(135deg, #00D4AA 0%, #00A388 100%)',
-              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+              width: 72, height: 72, marginBottom: 12,
+              position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              {finalPD} mm
+              <svg width="72" height="72" viewBox="0 0 72 72" fill="none">
+                <path d="M36 4L40.5 14.5L52 10L49.5 22L60 27L52 33.5L55 45.5L44 41L36 50L28 41L17 45.5L20 33.5L12 27L22.5 22L20 10L31.5 14.5Z" fill="none" stroke="#00C8FF" strokeWidth="2"/>
+                <circle cx="36" cy="30" r="16" fill="#00C8FF"/>
+                <path d="M27 30L33 36L45 24" stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
             </div>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginBottom: 24 }}>Merenje završeno</p>
 
-            <div className="info-box" style={{ textAlign: 'left', marginTop: '20px' }}>
-              <p style={{ fontWeight: '600', marginBottom: '6px', fontSize: '14px' }}>ℹ️ Napomena</p>
-              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', margin: 0, lineHeight: '1.6' }}>
-                Ovo je približna vrednost. Za dioptriju ±4.00 i veću, preporučujemo profesionalno merenje.
-              </p>
-            </div>
-
+            {/* PD card */}
             <div style={{
-              marginTop: '16px', padding: '14px',
-              background: 'rgba(255,255,255,0.05)', borderRadius: '10px', fontSize: '13px',
+              width: '100%', background: '#161b22', borderRadius: 16,
+              border: '1px solid rgba(255,255,255,0.08)', padding: '20px 24px',
+              textAlign: 'center', marginBottom: 20,
             }}>
-              <span style={{ color: 'rgba(255,255,255,0.5)' }}>Normalne vrednosti: </span>
-              <strong>Odrasli:</strong> 54–74mm &nbsp;|&nbsp; <strong>Deca:</strong> 43–58mm
-            </div>
-
-            {showManualCopy ? (
-              <div style={{
-                marginTop: '20px', background: 'rgba(0,212,170,0.1)',
-                border: '1px solid rgba(0,212,170,0.4)', borderRadius: '12px', padding: '20px',
-              }}>
-                <p style={{ margin: '0 0 8px 0', fontSize: '14px', color: 'rgba(255,255,255,0.7)' }}>Vaš PD broj je:</p>
-                <div style={{ fontSize: '48px', fontWeight: '700', color: '#00D4AA', margin: '0 0 8px 0' }}>{finalPD}</div>
-                <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: 'rgba(255,255,255,0.6)', lineHeight: '1.5' }}>
-                  Kopirano u clipboard. Zatvorite ovaj tab i unesite vrednost ručno.
-                </p>
-                <button className="btn-secondary" onClick={() => window.close()} style={{ width: '100%' }}>Zatvori tab</button>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', marginBottom: 10 }}>
+                Vaše PD rastojanje
               </div>
-            ) : (
-              <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
-                <button className="btn-secondary" onClick={reset} style={{ flex: 1 }}>Ponovi</button>
-                <button className="btn-primary" onClick={() => returnValue(finalPD)} style={{ flex: 2 }}>
-                  {source === 'vto'  ? 'Vrati u Optičarku' :
-                   source === 'lool' ? 'Sačuvaj i vrati se' :
-                                       'Kopiraj vrednost'}
-                </button>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
+                <span style={{ fontSize: 72, fontWeight: 800, color: '#00C8FF', lineHeight: 1 }}>{finalPD}</span>
+                <span style={{ fontSize: 24, fontWeight: 600, color: 'rgba(255,255,255,0.6)' }}>mm</span>
+              </div>
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>Normalan opseg: 48–80 mm</div>
+            </div>
+
+            {/* Out of range warning */}
+            {finalPD != null && (finalPD < 48 || finalPD > 80) && (
+              <div style={{
+                width: '100%', background: 'rgba(180,110,0,0.15)', border: '1px solid rgba(180,110,0,0.35)',
+                borderRadius: 12, padding: '12px 16px', marginBottom: 20,
+                display: 'flex', gap: 10, alignItems: 'flex-start',
+              }}>
+                <span style={{ fontSize: 16 }}>⚠</span>
+                <span style={{ fontSize: 13, color: '#F59E0B', lineHeight: 1.5 }}>
+                  Rezultat van opsega 48–80 mm. Pokušajte ponovo ili posetite optičara.
+                </span>
               </div>
             )}
+
+            {showManualCopy ? (
+              <div style={{ width: '100%', textAlign: 'center' }}>
+                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>Vaš PD broj je:</p>
+                <div style={{ fontSize: 52, fontWeight: 800, color: '#00C8FF', marginBottom: 8 }}>{finalPD}</div>
+                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginBottom: 20, lineHeight: 1.5 }}>
+                  Kopirano u clipboard. Zatvorite ovaj tab i unesite vrednost ručno.
+                </p>
+                <button className="btn-secondary" onClick={() => window.close()}>Zatvori tab</button>
+              </div>
+            ) : (
+              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <button className="btn-primary" onClick={() => returnValue(finalPD)}>
+                  {source === 'vto' ? 'Vrati u Optičarku' : source === 'lool' ? 'Sačuvaj i vrati se' : 'Kopiraj vrednost'}
+                </button>
+                <button className="btn-secondary" onClick={reset}>Izmeri ponovo</button>
+              </div>
+            )}
+
+            {/* Footer */}
+            <p style={{ marginTop: 28, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.2)' }}>
+              Brinemo o vašim očima i vašoj privatnosti
+            </p>
           </div>
         )}
 
-        <p style={{ textAlign: 'center', marginTop: '24px', color: 'rgba(255,255,255,0.3)', fontSize: '11px' }}>
-          🔒 Merenje se vrši lokalno — podaci ne napuštaju vaš uređaj
-        </p>
       </div>
     </div>
   );
