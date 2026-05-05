@@ -2,13 +2,6 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 
 const CREDIT_CARD_WIDTH_MM = 85.6;
 
-// Send PD result to parent window (Shopify)
-const sendResultToParent = (pd) => {
-  if (window.parent !== window) {
-    window.parent.postMessage({ type: 'PD_RESULT', value: pd }, '*');
-  }
-};
-
 const PDMeasurement = () => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -23,17 +16,29 @@ const PDMeasurement = () => {
   const [finalPD, setFinalPD] = useState(null);
   const [faceDetected, setFaceDetected] = useState(false);
   const [currentPD, setCurrentPD] = useState(null);
+  const [showManualCopy, setShowManualCopy] = useState(false);
   const animationRef = useRef(null);
   const lastVideoTimeRef = useRef(-1);
 
-  // Load MediaPipe
+  // URL params (parsed once, stable across renders)
+  const urlParams = useRef((() => {
+    const p = new URLSearchParams(window.location.search);
+    return {
+      source: p.get('source'),     // 'vto' | 'lool' | null
+      returnUrl: p.get('return'),  // encoded return URL (VTO only)
+    };
+  })());
+  const { source, returnUrl } = urlParams.current;
+
+  // Load MediaPipe Face Mesh
   useEffect(() => {
     const loadMediaPipe = async () => {
       setLoading(true);
       
       try {
-        setLoadingStatus('Učitavanje biblioteke...');
+        setLoadingStatus('Učitavanje MediaPipe biblioteke...');
         
+        // Load MediaPipe Vision
         if (!window.FaceLandmarker) {
           await new Promise((resolve, reject) => {
             const script = document.createElement('script');
@@ -44,7 +49,9 @@ const PDMeasurement = () => {
           });
         }
 
-        setLoadingStatus('Inicijalizacija...');
+        setLoadingStatus('Inicijalizacija Face Mesh modela...');
+        
+        // Wait for the module to be available
         await new Promise(resolve => setTimeout(resolve, 500));
         
         const vision = await window.FilesetResolver.forVisionTasks(
@@ -71,6 +78,7 @@ const PDMeasurement = () => {
       } catch (err) {
         console.error('MediaPipe loading error:', err);
         
+        // Try CPU fallback
         try {
           setLoadingStatus('Pokušavam CPU režim...');
           
@@ -92,7 +100,8 @@ const PDMeasurement = () => {
           setLoadingStatus('');
           
         } catch (fallbackErr) {
-          setError('Vaš uređaj ne podržava ovu funkciju. Probajte Chrome browser.');
+          console.error('CPU fallback failed:', fallbackErr);
+          setError(`Greška: ${err.message}. Probajte osvežiti stranicu ili koristiti drugi pretraživač (Chrome preporučen).`);
           setLoading(false);
         }
       }
@@ -107,8 +116,10 @@ const PDMeasurement = () => {
     };
   }, []);
 
+  // Start camera
   const startCamera = async () => {
     try {
+      // Request camera with mobile-friendly constraints
       const constraints = {
         video: {
           facingMode: 'user',
@@ -123,29 +134,36 @@ const PDMeasurement = () => {
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         
+        // Wait for video to be ready
         await new Promise((resolve) => {
           videoRef.current.onloadedmetadata = () => {
             videoRef.current.play().then(resolve).catch(resolve);
           };
         });
         
+        // Give it a moment to stabilize
         await new Promise(resolve => setTimeout(resolve, 300));
         setCameraReady(true);
       }
     } catch (err) {
+      console.error('Camera error:', err);
       if (err.name === 'NotAllowedError') {
-        setError('Dozvolite pristup kameri u podešavanjima pretraživača.');
+        setError('Pristup kameri je odbijen. Dozvolite pristup kameri u podešavanjima pretraživača.');
       } else if (err.name === 'NotFoundError') {
-        setError('Kamera nije pronađena.');
+        setError('Kamera nije pronađena na ovom uređaju.');
       } else {
         setError(`Greška kamere: ${err.message}`);
       }
     }
   };
 
+  // MediaPipe Face Mesh landmark indices
+  // Left iris: 468-472, center at 468
+  // Right iris: 473-477, center at 473
   const LEFT_IRIS = 468;
   const RIGHT_IRIS = 473;
 
+  // Detect face
   const detectFace = useCallback(() => {
     if (!faceMesh || !videoRef.current || !canvasRef.current) {
       animationRef.current = requestAnimationFrame(detectFace);
@@ -164,6 +182,7 @@ const PDMeasurement = () => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
 
+    // Set canvas size to match video
     if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
@@ -175,6 +194,7 @@ const PDMeasurement = () => {
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
+      // Mirror the canvas
       ctx.save();
       ctx.scale(-1, 1);
       ctx.translate(-canvas.width, 0);
@@ -183,6 +203,7 @@ const PDMeasurement = () => {
         setFaceDetected(true);
         const landmarks = results.faceLandmarks[0];
 
+        // Get iris positions (normalized 0-1, need to scale to video dimensions)
         const leftIris = landmarks[LEFT_IRIS];
         const rightIris = landmarks[RIGHT_IRIS];
 
@@ -204,7 +225,7 @@ const PDMeasurement = () => {
           ctx.arc(rightX, rightY, 18, 0, Math.PI * 2);
           ctx.stroke();
 
-          // Draw centers
+          // Draw iris centers
           ctx.fillStyle = '#00D4AA';
           ctx.beginPath();
           ctx.arc(leftX, leftY, 5, 0, Math.PI * 2);
@@ -224,15 +245,19 @@ const PDMeasurement = () => {
           ctx.stroke();
           ctx.setLineDash([]);
 
+          // Calculate pixel distance
           const pixelDistance = Math.sqrt(
             Math.pow(rightX - leftX, 2) +
             Math.pow(rightY - leftY, 2)
           );
 
+          // Calculate PD if calibrated
           if (cardWidth && step === 'measure') {
             const mmPerPixel = CREDIT_CARD_WIDTH_MM / cardWidth;
             const pd = pixelDistance * mmPerPixel;
             setCurrentPD(Math.round(pd));
+            
+            // Store measurement
             setMeasurements(prev => [...prev, pd].slice(-30));
           }
         }
@@ -249,6 +274,7 @@ const PDMeasurement = () => {
     animationRef.current = requestAnimationFrame(detectFace);
   }, [faceMesh, cardWidth, step]);
 
+  // Start detection when ready
   useEffect(() => {
     if (cameraReady && faceMesh && (step === 'calibrate' || step === 'measure')) {
       lastVideoTimeRef.current = -1;
@@ -262,6 +288,7 @@ const PDMeasurement = () => {
     };
   }, [cameraReady, faceMesh, step, detectFace]);
 
+  // Card calibration
   const [cardPoints, setCardPoints] = useState([]);
   
   const handleCanvasClick = (e) => {
@@ -278,6 +305,7 @@ const PDMeasurement = () => {
     const newPoints = [...cardPoints, { x, y }];
     setCardPoints(newPoints);
     
+    // Draw point immediately
     const ctx = canvas.getContext('2d');
     ctx.save();
     ctx.scale(-1, 1);
@@ -310,6 +338,7 @@ const PDMeasurement = () => {
     }
   };
 
+  // Touch support for mobile
   const handleTouch = (e) => {
     e.preventDefault();
     const touch = e.touches[0];
@@ -319,31 +348,63 @@ const PDMeasurement = () => {
     });
   };
 
-  const finalizeMeasurement = () => {
-    if (measurements.length < 10) {
-      setError('Držite glavu mirno još nekoliko sekundi.');
+  // Return value to caller (postMessage → close tab → URL redirect → manual copy)
+  const returnValue = (pd) => {
+    navigator.clipboard?.writeText(String(pd)).catch(() => {});
+
+    const openerAlive = window.opener && !window.opener.closed;
+    if (openerAlive) {
+      try { window.opener.postMessage({ type: 'PD_RESULT', value: pd }, '*'); } catch (e) {}
+      setTimeout(() => window.close(), 300);
       return;
     }
-    
+
+    if (source === 'vto' && returnUrl) {
+      const url = new URL(decodeURIComponent(returnUrl));
+      url.searchParams.set('pd', pd);
+      url.searchParams.set('reopenVTO', '1');
+      window.location.href = url.toString();
+      return;
+    }
+
+    // LOOL (or unknown) without opener — show manual copy UI
+    setShowManualCopy(true);
+  };
+
+  // Calculate final PD
+  const finalizeMeasurement = () => {
+    if (measurements.length < 10) {
+      setError('Potrebno je više merenja. Držite glavu mirno još nekoliko sekundi.');
+      return;
+    }
+
     const sorted = [...measurements].sort((a, b) => a - b);
     const q1 = sorted[Math.floor(sorted.length * 0.25)];
     const q3 = sorted[Math.floor(sorted.length * 0.75)];
     const iqr = q3 - q1;
-    
+
     const filtered = sorted.filter(v => v >= q1 - 1.5 * iqr && v <= q3 + 1.5 * iqr);
     const median = filtered[Math.floor(filtered.length / 2)];
-    const result = Math.round(median);
-    
-    setFinalPD(result);
+    const rawPd = Math.round(median);
+
+    // Clamp only for VTO (dropdown range 48–80)
+    const displayPd = source === 'vto' ? Math.max(48, Math.min(80, rawPd)) : rawPd;
+    const isOutOfRange = source === 'vto'
+      ? (rawPd < 48 || rawPd > 80)
+      : (rawPd < 40 || rawPd > 80.5);
+
+    if (isOutOfRange) {
+      setError(`Izmerena vrednost (${rawPd} mm) je van normalnog opsega. Pokušajte ponovo uz bolju kalibraciju.`);
+    }
+
+    setFinalPD(displayPd);
     setStep('result');
-    
-    // Send to Shopify
-    sendResultToParent(result);
     
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
     }
     
+    // Stop camera
     if (videoRef.current?.srcObject) {
       videoRef.current.srcObject.getTracks().forEach(track => track.stop());
     }
@@ -378,6 +439,8 @@ const PDMeasurement = () => {
       paddingBottom: '40px'
     }}>
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+        
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         
         .glass-card {
@@ -398,7 +461,7 @@ const PDMeasurement = () => {
           font-weight: 600;
           font-size: 16px;
           cursor: pointer;
-          transition: all 0.2s ease;
+          transition: all 0.3s ease;
           font-family: inherit;
           touch-action: manipulation;
         }
@@ -564,7 +627,9 @@ const PDMeasurement = () => {
             marginBottom: '20px'
           }}>
             <p style={{ color: '#FF6B6B', margin: '0 0 12px 0', fontSize: '14px' }}>{error}</p>
-            <button className="btn-secondary" onClick={() => setError(null)}>OK</button>
+            <button className="btn-secondary" onClick={() => setError(null)}>
+              OK
+            </button>
           </div>
         )}
 
@@ -696,6 +761,7 @@ const PDMeasurement = () => {
               <canvas ref={canvasRef} />
             </div>
 
+            {/* Progress */}
             <div style={{ marginTop: '16px' }}>
               <div style={{ 
                 display: 'flex', 
@@ -705,7 +771,7 @@ const PDMeasurement = () => {
               }}>
                 <span>Uzorci: {measurements.length}/30</span>
                 <span style={{ color: measurements.length >= 10 ? '#00D4AA' : 'rgba(255,255,255,0.5)' }}>
-                  {measurements.length >= 10 ? '✓ Spremno' : 'Prikupljanje...'}
+                  {measurements.length >= 10 ? '✓ Spremno za završetak' : 'Prikupljanje...'}
                 </span>
               </div>
               <div className="progress-bar">
@@ -772,31 +838,51 @@ const PDMeasurement = () => {
               fontSize: '13px'
             }}>
               <span style={{ color: 'rgba(255,255,255,0.5)' }}>Normalne vrednosti: </span>
-              <strong>Odrasli:</strong> 54-74mm
+              <strong>Odrasli:</strong> 54-74mm &nbsp;|&nbsp; <strong>Deca:</strong> 43-58mm
             </div>
 
-            <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
-              <button className="btn-secondary" onClick={reset} style={{ flex: 1 }}>
-                Ponovi
-              </button>
-              <button 
-                className="btn-primary" 
-                onClick={() => {
-                  if (navigator.clipboard) {
-                    navigator.clipboard.writeText(`${finalPD}`);
-                  }
-                  // Also send to parent again
-                  sendResultToParent(finalPD);
-                  alert(`PD vrednost (${finalPD}mm) je kopirana!`);
-                }}
-                style={{ flex: 1 }}
-              >
-                Kopiraj
-              </button>
-            </div>
+            {showManualCopy ? (
+              <div style={{
+                marginTop: '20px',
+                background: 'rgba(0, 212, 170, 0.1)',
+                border: '1px solid rgba(0, 212, 170, 0.4)',
+                borderRadius: '12px',
+                padding: '20px',
+                textAlign: 'center'
+              }}>
+                <p style={{ margin: '0 0 8px 0', fontSize: '14px', color: 'rgba(255,255,255,0.7)' }}>
+                  Vaš PD broj je:
+                </p>
+                <div style={{ fontSize: '48px', fontWeight: '700', color: '#00D4AA', margin: '0 0 8px 0' }}>
+                  {finalPD}
+                </div>
+                <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: 'rgba(255,255,255,0.6)', lineHeight: '1.5' }}>
+                  Kopirano u clipboard. Zatvorite ovaj tab i unesite vrednost ručno.
+                </p>
+                <button className="btn-secondary" onClick={() => window.close()} style={{ width: '100%' }}>
+                  Zatvori tab
+                </button>
+              </div>
+            ) : (
+              <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
+                <button className="btn-secondary" onClick={reset} style={{ flex: 1 }}>
+                  Ponovi
+                </button>
+                <button
+                  className="btn-primary"
+                  onClick={() => returnValue(finalPD)}
+                  style={{ flex: 2 }}
+                >
+                  {source === 'vto'  ? 'Vrati u Optičarku' :
+                   source === 'lool' ? 'Sačuvaj i vrati se' :
+                                       'Kopiraj vrednost'}
+                </button>
+              </div>
+            )}
           </div>
         )}
 
+        {/* Footer */}
         <p style={{ 
           textAlign: 'center', 
           marginTop: '24px',
