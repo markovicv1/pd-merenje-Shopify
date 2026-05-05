@@ -4,9 +4,9 @@ const CREDIT_CARD_WIDTH_MM = 85.6;
 const LEFT_IRIS  = 468;
 const RIGHT_IRIS = 473;
 const HISTORY_SIZE   = 25;
-const STILL_THRESHOLD = 4;   // px stddev
-const MIN_IRIS_PX    = 65;   // too far if below
-const MAX_IRIS_PX    = 200;  // too close if above
+const STILL_THRESHOLD = 4;
+const MIN_IRIS_PX    = 65;
+const MAX_IRIS_PX    = 200;
 const COUNTDOWN_MS   = 3000;
 
 function stddev(arr) {
@@ -14,11 +14,20 @@ function stddev(arr) {
   return Math.sqrt(arr.reduce((a, b) => a + (b - mean) ** 2, 0) / arr.length);
 }
 
+// Eye icon SVG (from Figma, colors inverted for dark background)
+const EyeIconSVG = ({ size = 28 }) => (
+  <svg width={size} height={Math.round(size * 50 / 69)} viewBox="0 0 69 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M34.0588 0.000897306C16.3473 0.139269 4.30924 15.8855 0.237757 24.2099C0.0803319 24.5318 0.0631652 24.8963 0.176471 25.2362C3.94118 33.2362 15.9882 49.2362 34.0588 49.2362C51.2032 49.2362 63.5611 34.5167 68.2992 26.0252C68.7594 25.2006 68.7622 24.2118 68.3073 23.3843C63.575 14.7765 51.2129 -0.133119 34.0588 0.000897306Z" fill="white"/>
+    <circle cx="34.4118" cy="24.5303" r="18.1765" fill="#0d1117"/>
+    <path d="M34.4122 11.6481C41.5267 11.6484 47.2939 17.4155 47.2941 24.53C47.2941 31.6445 41.5267 37.4125 34.4122 37.4128C27.2975 37.4128 21.5294 31.6447 21.5294 24.53C21.5294 24.2111 21.5408 23.8948 21.5636 23.5817C22.6269 24.0381 23.7981 24.2927 25.0284 24.2927C29.8843 24.2924 33.8203 20.3555 33.8204 15.4997C33.8204 14.1498 33.5154 12.8712 32.9718 11.7282C33.4446 11.6756 33.9254 11.6481 34.4122 11.6481Z" fill="white"/>
+  </svg>
+);
+
 const PDMeasurement = () => {
   const videoRef    = useRef(null);
   const canvasRef   = useRef(null);
   const imgRef      = useRef(null);
-  const adjustRef   = useRef(null); // container for adjust markers
+  const adjustRef   = useRef(null);
 
   const [step, setStep]               = useState('intro');
   const [cameraReady, setCameraReady] = useState(false);
@@ -28,13 +37,12 @@ const PDMeasurement = () => {
   const [error, setError]             = useState(null);
   const [finalPD, setFinalPD]         = useState(null);
   const [faceDetected, setFaceDetected] = useState(false);
-  const [faceStatus, setFaceStatus]   = useState('none'); // none|far|good|close
+  const [faceStatus, setFaceStatus]   = useState('none');
   const [countdown, setCountdown]     = useState(null);
   const [snapshotUrl, setSnapshotUrl] = useState(null);
-  const [snapshotAspect, setSnapshotAspect] = useState(1);
   const [showManualCopy, setShowManualCopy] = useState(false);
+  const [eyeOpen, setEyeOpen]         = useState(true);
 
-  // Markers stored as % of snapshot (0–100)
   const [cardMarkers, setCardMarkers]   = useState([
     { x: 12, y: 68 }, { x: 88, y: 68 }
   ]);
@@ -46,16 +54,30 @@ const PDMeasurement = () => {
   const lastTimeRef       = useRef(-1);
   const faceHistoryRef    = useRef([]);
   const cntdwnStartRef    = useRef(null);
-  const draggingRef       = useRef(null); // { group:'card'|'pupil', index:0|1 }
+  const draggingRef       = useRef(null);
 
-  // URL params
   const urlParams = useRef((() => {
     const p = new URLSearchParams(window.location.search);
     return { source: p.get('source'), returnUrl: p.get('return') };
   })());
   const { source, returnUrl } = urlParams.current;
 
-  // ── MediaPipe loading ────────────────────────────────────────────────────
+  // ── Eye blink animation ───────────────────────────────────────────────────
+  useEffect(() => {
+    let closeTimer;
+    const blink = () => {
+      setEyeOpen(false);
+      closeTimer = setTimeout(() => setEyeOpen(true), 180);
+    };
+    // First blink after 1.5s, then every 3.5s
+    const first = setTimeout(() => {
+      blink();
+    }, 1500);
+    const interval = setInterval(blink, 3500);
+    return () => { clearInterval(interval); clearTimeout(first); clearTimeout(closeTimer); };
+  }, []);
+
+  // ── MediaPipe loading ─────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -97,7 +119,7 @@ const PDMeasurement = () => {
     return () => { cancelled = true; cancelAnimationFrame(animationRef.current); };
   }, []);
 
-  // ── Camera ───────────────────────────────────────────────────────────────
+  // ── Camera ────────────────────────────────────────────────────────────────
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -170,7 +192,6 @@ const PDMeasurement = () => {
       const rY = rIris.y * canvas.height;
       const irisD = Math.abs(rX - lX);
 
-      // Draw iris markers
       ctx.strokeStyle = '#00D4AA'; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.arc(lX, lY, 18, 0, Math.PI * 2); ctx.stroke();
       ctx.beginPath(); ctx.arc(rX, rY, 18, 0, Math.PI * 2); ctx.stroke();
@@ -181,11 +202,9 @@ const PDMeasurement = () => {
       ctx.beginPath(); ctx.moveTo(lX, lY); ctx.lineTo(rX, rY); ctx.stroke();
       ctx.setLineDash([]);
 
-      // Proximity
       let status = irisD < MIN_IRIS_PX ? 'far' : irisD > MAX_IRIS_PX ? 'close' : 'good';
       setFaceStatus(status);
 
-      // Stillness
       const hist = faceHistoryRef.current;
       hist.push({ lX, lY, rX, rY });
       if (hist.length > HISTORY_SIZE) hist.shift();
@@ -193,7 +212,6 @@ const PDMeasurement = () => {
         && stddev(hist.map(h => h.lX)) < STILL_THRESHOLD
         && stddev(hist.map(h => h.rX)) < STILL_THRESHOLD;
 
-      // Countdown
       if (status === 'good' && isStill) {
         if (!cntdwnStartRef.current) cntdwnStartRef.current = Date.now();
         const elapsed  = Date.now() - cntdwnStartRef.current;
@@ -201,11 +219,9 @@ const PDMeasurement = () => {
         setCountdown(remaining);
 
         if (elapsed >= COUNTDOWN_MS) {
-          // ── CAPTURE ────────────────────────────────────────────
           cancelAnimationFrame(animationRef.current);
           ctx.restore();
 
-          // Crop snapshot to 3:4 (same crop object-fit:cover shows in the video container)
           const vW = video.videoWidth;
           const vH = video.videoHeight;
           const targetAspect = 3 / 4;
@@ -226,14 +242,12 @@ const PDMeasurement = () => {
 
           const url = snap.toDataURL('image/jpeg', 0.92);
 
-          // Iris positions mapped into the cropped+mirrored frame
           const lXp = ((1 - lIris.x) * vW - srcX) / srcW * 100;
           const rXp = ((1 - rIris.x) * vW - srcX) / srcW * 100;
           const lYp = (lIris.y * vH - srcY) / srcH * 100;
           const rYp = (rIris.y * vH - srcY) / srcH * 100;
 
           setSnapshotUrl(url);
-          setSnapshotAspect(snap.width / snap.height);
           setPupilMarkers([{ x: lXp, y: lYp }, { x: rXp, y: rYp }]);
           setCardMarkers([{ x: 12, y: 70 }, { x: 88, y: 70 }]);
           setCountdown(null);
@@ -252,7 +266,6 @@ const PDMeasurement = () => {
     animationRef.current = requestAnimationFrame(detectFace);
   }, [faceMesh]);
 
-  // Start detection when camera + model ready
   useEffect(() => {
     if (cameraReady && faceMesh && step === 'detecting') {
       lastTimeRef.current = -1;
@@ -292,7 +305,7 @@ const PDMeasurement = () => {
 
   const onContainerUp = () => { draggingRef.current = null; };
 
-  // ── PD calculation from markers ───────────────────────────────────────────
+  // ── PD calculation ────────────────────────────────────────────────────────
   const calculatePD = () => {
     const el = adjustRef.current;
     if (!el) return;
@@ -412,7 +425,7 @@ const PDMeasurement = () => {
     canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
   `;
 
-  // ── Shared header bar ──────────────────────────────────────────────────────
+  // ── Shared header bar ─────────────────────────────────────────────────────
   const HeaderBar = () => (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -422,12 +435,15 @@ const PDMeasurement = () => {
         <div style={{
           width: 36, height: 36, borderRadius: 8, background: '#161b22',
           border: '1px solid rgba(255,255,255,0.1)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <img
-            src="https://opticarka.com/cdn/shop/t/39/assets/opticarka_logo_over_stream_black.png"
-            alt="" style={{ width: 26, filter: 'invert(1)', opacity: 0.9 }}
-          />
+          <div style={{
+            transform: eyeOpen ? 'scaleY(1)' : 'scaleY(0.08)',
+            transition: eyeOpen ? 'transform 0.25s ease' : 'transform 0.08s ease',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <EyeIconSVG size={22} />
+          </div>
         </div>
         <div>
           <div style={{ fontWeight: 700, fontSize: 14, color: '#fff', lineHeight: 1.2 }}>PD Kalkulator</div>
@@ -441,38 +457,66 @@ const PDMeasurement = () => {
     </div>
   );
 
-  // ── Render: ADJUST (full-width, breaks out of 500px container) ───────────
+  // ── ADJUST step ───────────────────────────────────────────────────────────
   if (step === 'adjust' && snapshotUrl) {
     return (
       <div style={{ minHeight: '100vh', background: '#0d1117', fontFamily: 'Inter, -apple-system, sans-serif', color: '#fff', display: 'flex', flexDirection: 'column' }}>
         <style>{SHARED_CSS}</style>
         <HeaderBar />
-        <div style={{ padding: '8px 16px 6px', display: 'flex', alignItems: 'center', gap: 16, fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
+        <div style={{ padding: '8px 16px 6px', display: 'flex', alignItems: 'center', gap: 16, fontSize: 12, color: 'rgba(255,255,255,0.45)', flexShrink: 0 }}>
           <span><span style={{ color: '#FF6B6B' }}>━</span> ivice kartice</span>
           <span><span style={{ color: '#00C8FF' }}>━</span> zenice</span>
           <span style={{ marginLeft: 'auto' }}>Prevucite markere</span>
         </div>
-        <div
-          ref={adjustRef}
-          onMouseMove={onContainerMove} onMouseUp={onContainerUp} onMouseLeave={onContainerUp}
-          onTouchMove={onContainerMove} onTouchEnd={onContainerUp}
-          style={{ position: 'relative', touchAction: 'none', flex: 1 }}
-        >
-          <img ref={imgRef} src={snapshotUrl} alt="snapshot" style={{ width: '100%', display: 'block' }} draggable={false} />
-          <img src="https://opticarka.com/cdn/shop/t/39/assets/opticarka_logo_over_stream_black.png" alt=""
-            style={{ position: 'absolute', top: 10, left: 10, width: 100, pointerEvents: 'none', zIndex: 5, filter: 'invert(1) drop-shadow(0 1px 3px rgba(0,0,0,0.8))' }} />
-          {cardMarkers.map((m, i) => (
-            <div key={`card-${i}`} className="marker" onMouseDown={e => onMarkerDown('card', i, e)} onTouchStart={e => onMarkerDown('card', i, e)} style={{ left: `${m.x}%`, top: `${m.y}%`, color: '#FF6B6B' }}>
-              <div className="marker-h" /><div className="marker-v" /><div className="marker-dot" />
+
+        {/* Photo area: height-constrained, centered */}
+        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', background: '#000', overflow: 'hidden', minHeight: 0 }}>
+          <div
+            ref={adjustRef}
+            onMouseMove={onContainerMove} onMouseUp={onContainerUp} onMouseLeave={onContainerUp}
+            onTouchMove={onContainerMove} onTouchEnd={onContainerUp}
+            style={{ position: 'relative', touchAction: 'none', aspectRatio: '3/4', height: '100%', maxWidth: '100%' }}
+          >
+            <img
+              ref={imgRef}
+              src={snapshotUrl}
+              alt="snapshot"
+              style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }}
+              draggable={false}
+            />
+
+            {/* Logo overlay — white background box for visibility on any photo */}
+            <div style={{
+              position: 'absolute', top: 10, left: 10, zIndex: 5, pointerEvents: 'none',
+              background: 'rgba(255,255,255,0.92)', borderRadius: 8, padding: '4px 10px',
+            }}>
+              <img
+                src="https://opticarka.com/cdn/shop/t/39/assets/opticarka_logo_over_stream_black.png"
+                alt=""
+                style={{ width: 90, display: 'block' }}
+              />
             </div>
-          ))}
-          {pupilMarkers.map((m, i) => (
-            <div key={`pupil-${i}`} className="marker" onMouseDown={e => onMarkerDown('pupil', i, e)} onTouchStart={e => onMarkerDown('pupil', i, e)} style={{ left: `${m.x}%`, top: `${m.y}%`, color: '#00C8FF' }}>
-              <div className="marker-h" /><div className="marker-v" /><div className="marker-dot" />
-            </div>
-          ))}
+
+            {cardMarkers.map((m, i) => (
+              <div key={`card-${i}`} className="marker"
+                onMouseDown={e => onMarkerDown('card', i, e)}
+                onTouchStart={e => onMarkerDown('card', i, e)}
+                style={{ left: `${m.x}%`, top: `${m.y}%`, color: '#FF6B6B' }}>
+                <div className="marker-h" /><div className="marker-v" /><div className="marker-dot" />
+              </div>
+            ))}
+            {pupilMarkers.map((m, i) => (
+              <div key={`pupil-${i}`} className="marker"
+                onMouseDown={e => onMarkerDown('pupil', i, e)}
+                onTouchStart={e => onMarkerDown('pupil', i, e)}
+                style={{ left: `${m.x}%`, top: `${m.y}%`, color: '#00C8FF' }}>
+                <div className="marker-h" /><div className="marker-v" /><div className="marker-dot" />
+              </div>
+            ))}
+          </div>
         </div>
-        <div style={{ padding: '12px 16px 28px', display: 'flex', gap: 10 }}>
+
+        <div style={{ padding: '12px 16px 28px', display: 'flex', gap: 10, flexShrink: 0 }}>
           <button className="btn-secondary" onClick={retryDetect} style={{ flex: 1 }}>Ponovi</button>
           <button className="btn-primary" onClick={calculatePD} style={{ flex: 2 }}>Izračunaj PD</button>
         </div>
@@ -480,7 +524,7 @@ const PDMeasurement = () => {
     );
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Main render ───────────────────────────────────────────────────────────
   return (
     <div style={{
       minHeight: '100vh', background: '#0d1117',
@@ -521,13 +565,21 @@ const PDMeasurement = () => {
           <>
             <HeaderBar />
             <div style={{ flex: 1, padding: '32px 20px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              {/* Camera icon */}
+              {/* Eye icon large */}
               <div style={{
                 width: 80, height: 80, borderRadius: 20, background: '#161b22',
                 border: '1px solid rgba(255,255,255,0.1)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 36, marginBottom: 20,
-              }}>📷</div>
+                marginBottom: 20,
+              }}>
+                <div style={{
+                  transform: eyeOpen ? 'scaleY(1)' : 'scaleY(0.08)',
+                  transition: eyeOpen ? 'transform 0.25s ease' : 'transform 0.08s ease',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <EyeIconSVG size={44} />
+                </div>
+              </div>
 
               <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 8, textAlign: 'center' }}>
                 Izmerite <span style={{ color: '#00C8FF' }}>PD</span>
@@ -543,7 +595,7 @@ const PDMeasurement = () => {
               }}>
                 {[
                   { icon: '💳', text: 'Držite karticu na vrhu nosa ili čela' },
-                  { icon: '👁️', text: 'Gledajte TAČNO u kameru' },
+                  { icon: null, text: 'Gledajte TAČNO u kameru' },
                   { icon: '🧍', text: 'Mirujte 3 sekunde' },
                   { icon: '🎯', text: 'Označite ivice kartice' },
                 ].map((item, i) => (
@@ -552,7 +604,19 @@ const PDMeasurement = () => {
                     padding: '13px 18px',
                     borderBottom: i < 3 ? '1px solid rgba(255,255,255,0.05)' : 'none',
                   }}>
-                    <span style={{ fontSize: 20, flexShrink: 0 }}>{item.icon}</span>
+                    {item.icon ? (
+                      <span style={{ fontSize: 20, flexShrink: 0, width: 24, textAlign: 'center' }}>{item.icon}</span>
+                    ) : (
+                      <span style={{ flexShrink: 0, width: 24, display: 'flex', justifyContent: 'center' }}>
+                        <div style={{
+                          transform: eyeOpen ? 'scaleY(1)' : 'scaleY(0.08)',
+                          transition: eyeOpen ? 'transform 0.25s ease' : 'transform 0.08s ease',
+                          display: 'flex', alignItems: 'center',
+                        }}>
+                          <EyeIconSVG size={20} />
+                        </div>
+                      </span>
+                    )}
                     <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.85)' }}>{item.text}</span>
                   </div>
                 ))}
@@ -584,8 +648,7 @@ const PDMeasurement = () => {
           <>
             <HeaderBar />
 
-            {/* Status badges */}
-            <div style={{ display: 'flex', gap: 8, padding: '10px 16px' }}>
+            <div style={{ display: 'flex', gap: 8, padding: '10px 16px', flexShrink: 0 }}>
               {faceStatus === 'far' && (
                 <div style={{ background: 'rgba(180,110,0,0.85)', color: '#fff', fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 20 }}>
                   ↔ Priđite kameri
@@ -598,7 +661,6 @@ const PDMeasurement = () => {
               )}
             </div>
 
-            {/* Camera */}
             <div style={{ position: 'relative', background: '#000', aspectRatio: '3/4', overflow: 'hidden', flex: 1 }}>
               {/* Guide oval */}
               <div style={{
@@ -609,7 +671,6 @@ const PDMeasurement = () => {
                 pointerEvents: 'none', zIndex: 9, transition: 'border-color 0.3s ease',
               }} />
 
-              {/* Countdown */}
               {countdown !== null && (
                 <div style={{
                   position: 'absolute', top: '50%', left: '50%',
@@ -624,7 +685,6 @@ const PDMeasurement = () => {
               <video ref={videoRef} playsInline muted />
               <canvas ref={canvasRef} />
 
-              {/* Bottom status */}
               <div style={{
                 position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)',
                 display: 'flex', alignItems: 'center', gap: 8,
@@ -643,7 +703,6 @@ const PDMeasurement = () => {
                   : 'Odlično! Ostanite mirni'}
               </div>
 
-              {/* Error badge: face not detected */}
               {!faceDetected && cameraReady && (
                 <div style={{
                   position: 'absolute', bottom: 52, left: '50%', transform: 'translateX(-50%)',
@@ -656,7 +715,7 @@ const PDMeasurement = () => {
               )}
             </div>
 
-            <div style={{ padding: '12px 16px 28px' }}>
+            <div style={{ padding: '12px 16px 28px', flexShrink: 0 }}>
               <button className="btn-secondary" onClick={reset}>Otkaži</button>
             </div>
           </>
@@ -665,14 +724,13 @@ const PDMeasurement = () => {
         {/* ── RESULT ── */}
         {step === 'result' && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '36px 20px 28px' }}>
-            {/* Optičarka logo */}
+            {/* Optičarka logo — invert(1) works on dark result background */}
             <img
               src="https://opticarka.com/cdn/shop/t/39/assets/opticarka_logo_over_stream_black.png"
               alt="optičarka"
               style={{ width: 160, filter: 'invert(1)', opacity: 0.9, marginBottom: 28 }}
             />
 
-            {/* Badge */}
             <div style={{
               width: 72, height: 72, marginBottom: 12,
               position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -685,7 +743,6 @@ const PDMeasurement = () => {
             </div>
             <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginBottom: 24 }}>Merenje završeno</p>
 
-            {/* PD card */}
             <div style={{
               width: '100%', background: '#161b22', borderRadius: 16,
               border: '1px solid rgba(255,255,255,0.08)', padding: '20px 24px',
@@ -701,7 +758,6 @@ const PDMeasurement = () => {
               <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>Normalan opseg: 48–80 mm</div>
             </div>
 
-            {/* Out of range warning */}
             {finalPD != null && (finalPD < 48 || finalPD > 80) && (
               <div style={{
                 width: '100%', background: 'rgba(180,110,0,0.15)', border: '1px solid rgba(180,110,0,0.35)',
@@ -733,7 +789,6 @@ const PDMeasurement = () => {
               </div>
             )}
 
-            {/* Footer */}
             <p style={{ marginTop: 28, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.2)' }}>
               Brinemo o vašim očima i vašoj privatnosti
             </p>
