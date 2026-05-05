@@ -205,21 +205,32 @@ const PDMeasurement = () => {
           cancelAnimationFrame(animationRef.current);
           ctx.restore();
 
+          // Crop snapshot to 3:4 (same crop object-fit:cover shows in the video container)
+          const vW = video.videoWidth;
+          const vH = video.videoHeight;
+          const targetAspect = 3 / 4;
+          let srcX, srcY, srcW, srcH;
+          if (vW / vH > targetAspect) {
+            srcH = vH; srcW = vH * targetAspect;
+            srcX = (vW - srcW) / 2; srcY = 0;
+          } else {
+            srcW = vW; srcH = vW / targetAspect;
+            srcX = 0; srcY = (vH - srcH) / 2;
+          }
           const snap = document.createElement('canvas');
-          snap.width  = video.videoWidth;
-          snap.height = video.videoHeight;
+          snap.width = srcW; snap.height = srcH;
           const sc = snap.getContext('2d');
           sc.save(); sc.scale(-1, 1); sc.translate(-snap.width, 0);
-          sc.drawImage(video, 0, 0);
+          sc.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, snap.width, snap.height);
           sc.restore();
 
           const url = snap.toDataURL('image/jpeg', 0.92);
 
-          // Mirrored iris positions as pct of snapshot
-          const lXp = (1 - lIris.x) * 100;
-          const rXp = (1 - rIris.x) * 100;
-          const lYp = lIris.y * 100;
-          const rYp = rIris.y * 100;
+          // Iris positions mapped into the cropped+mirrored frame
+          const lXp = ((1 - lIris.x) * vW - srcX) / srcW * 100;
+          const rXp = ((1 - rIris.x) * vW - srcX) / srcW * 100;
+          const lYp = (lIris.y * vH - srcY) / srcH * 100;
+          const rYp = (rIris.y * vH - srcY) / srcH * 100;
 
           setSnapshotUrl(url);
           setSnapshotAspect(snap.width / snap.height);
@@ -622,6 +633,17 @@ const PDMeasurement = () => {
             </div>
 
             <div className="video-container">
+              {/* Face guide oval */}
+              <div style={{
+                position: 'absolute', top: '50%', left: '50%',
+                transform: 'translate(-50%, -52%)',
+                width: '62%', height: '72%',
+                borderRadius: '50%',
+                border: `2px dashed ${faceStatus === 'good' ? 'rgba(0,212,170,0.85)' : 'rgba(255,255,255,0.35)'}`,
+                pointerEvents: 'none', zIndex: 9,
+                transition: 'border-color 0.3s ease',
+              }} />
+
               {/* Face status */}
               <div style={{
                 position: 'absolute', top: 12, left: 12,
