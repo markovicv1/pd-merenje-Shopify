@@ -2,7 +2,10 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 
 // ── Inline SVGs from Figma export ─────────────────────────────────────────
 
-const IcoHeaderLogo = () => (
+const LOGO_URL = 'https://opticarka.com/cdn/shop/t/39/assets/opticarka_logo_over_stream_black.png';
+
+// kept for potential future use
+const _IcoHeaderLogo_unused = () => (
   <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
     <g clipPath="url(#hlogo)">
       <path d="M6.01311 28.5241C6.01311 29.4072 5.25998 30.1209 4.33748 30.1209C3.41498 30.1209 2.66873 29.4066 2.66873 28.5241C2.66873 27.6416 3.41561 26.9141 4.33748 26.9141C5.25936 26.9141 6.01311 27.6347 6.01311 28.5241ZM4.81936 28.3859C4.71873 28.0172 4.42248 27.7772 4.15811 27.8497C3.89311 27.9228 3.76123 28.2791 3.86248 28.6478C3.96373 29.0166 4.25936 29.2566 4.52373 29.1841C4.78811 29.1116 4.92061 28.7547 4.81936 28.3859Z" fill="white"/>
@@ -170,28 +173,35 @@ const GLOBAL_CSS = `
   .marker-dot { position: absolute; width: 8px; height: 8px; border-radius: 50%; border: 2px solid currentColor; top: 50%; left: 50%; transform: translate(-50%, -50%); }
 `;
 
+const MAX_W = 420;
+
 // ── Shared header component ───────────────────────────────────────────────
 const Header = ({ eyeVariant }) => (
-  <header style={{
-    display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
-    background: '#121724', padding: '19px 15px 13px 15px', flexShrink: 0,
-  }}>
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
-      <IcoHeaderLogo />
-      <div style={{ marginTop: 3, display: 'flex', flexDirection: 'column' }}>
-        <span style={{ color: '#fff', fontSize: 15, fontWeight: 600, marginLeft: -1, marginTop: -3 }}>PD Kalkulator</span>
-        <span style={{ color: '#8c8c8c', fontSize: 11, fontWeight: 400, marginLeft: -1 }}>Optičarka.com</span>
-      </div>
-    </div>
-    <button style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-      background: '#00b8ff', color: '#111', fontSize: 12, fontWeight: 600,
-      padding: '8px 16px', borderRadius: 100,
+  <div style={{ background: '#121724', flexShrink: 0 }}>
+    <header style={{
+      display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+      padding: '19px 15px 13px 15px',
+      maxWidth: MAX_W, margin: '0 auto', width: '100%',
     }}>
-      <IcoAiBadge />
-      <span>AI Powered</span>
-    </button>
-  </header>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
+        <div style={{ width: 32, height: 32, background: '#1f293d', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+          <img src={LOGO_URL} alt="" style={{ width: 24, height: 24, objectFit: 'contain', filter: 'invert(1)' }} />
+        </div>
+        <div style={{ marginTop: 3, display: 'flex', flexDirection: 'column' }}>
+          <span style={{ color: '#fff', fontSize: 15, fontWeight: 600, marginLeft: -1, marginTop: -3 }}>PD Kalkulator</span>
+          <span style={{ color: '#8c8c8c', fontSize: 11, fontWeight: 400, marginLeft: -1 }}>Optičarka.com</span>
+        </div>
+      </div>
+      <button style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+        background: '#00b8ff', color: '#111', fontSize: 12, fontWeight: 600,
+        padding: '8px 16px', borderRadius: 100,
+      }}>
+        <IcoAiBadge />
+        <span>AI Powered</span>
+      </button>
+    </header>
+  </div>
 );
 
 // ── Blue icon cell (used in checklist) ────────────────────────────────────
@@ -454,42 +464,50 @@ const PDMeasurement = () => {
   };
 
   // ══════════════════════════════════════════════════════════════════════
-  // ── ADJUST step (not in Figma — styled to match global dark theme) ───
+  // ── ADJUST step ───────────────────────────────────────────────────────
   // ══════════════════════════════════════════════════════════════════════
   if (step === 'adjust' && snapshotUrl) {
     return (
       <div style={{ minHeight: '100vh', background: '#171f2e', fontFamily: 'Inter, sans-serif', color: '#fff', display: 'flex', flexDirection: 'column' }}>
         <style>{GLOBAL_CSS}</style>
         <Header eyeVariant={eyeVariant} />
-        <div style={{ padding: '8px 16px 6px', display: 'flex', alignItems: 'center', gap: 16, fontSize: 12, color: '#8c8c8c', flexShrink: 0 }}>
+
+        {/* Legend — same max-width as content */}
+        <div style={{ maxWidth: MAX_W, width: '100%', alignSelf: 'center', padding: '8px 16px 6px', display: 'flex', alignItems: 'center', gap: 16, fontSize: 12, color: '#8c8c8c', flexShrink: 0 }}>
           <span><span style={{ color: '#FF6B6B' }}>━</span> ivice kartice</span>
           <span><span style={{ color: '#00b8ff' }}>━</span> zenice</span>
           <span style={{ marginLeft: 'auto' }}>Prevucite markere</span>
         </div>
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', background: '#050508', overflow: 'hidden', minHeight: 0 }}>
-          <div
-            ref={adjustRef}
-            onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
-            onTouchMove={onMove} onTouchEnd={onUp}
-            style={{ position: 'relative', touchAction: 'none', aspectRatio: '3/4', height: '100%', maxWidth: '100%' }}
-          >
-            <img ref={imgRef} src={snapshotUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} draggable={false} />
-            <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 5, pointerEvents: 'none', background: 'rgba(255,255,255,0.92)', borderRadius: 8, padding: '4px 10px' }}>
-              <img src="https://opticarka.com/cdn/shop/t/39/assets/opticarka_logo_over_stream_black.png" alt="" style={{ width: 90, display: 'block' }} />
+
+        {/* Photo area — same max-width, height fills remaining space */}
+        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', overflow: 'hidden', minHeight: 0 }}>
+          <div style={{ width: '100%', maxWidth: MAX_W, flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', background: '#050508', overflow: 'hidden', minHeight: 0 }}>
+            <div
+              ref={adjustRef}
+              onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
+              onTouchMove={onMove} onTouchEnd={onUp}
+              style={{ position: 'relative', touchAction: 'none', aspectRatio: '3/4', height: '100%', maxWidth: '100%' }}
+            >
+              <img ref={imgRef} src={snapshotUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} draggable={false} />
+              <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 5, pointerEvents: 'none', background: 'rgba(255,255,255,0.92)', borderRadius: 8, padding: '4px 10px' }}>
+                <img src={LOGO_URL} alt="" style={{ width: 90, display: 'block' }} />
+              </div>
+              {cardMarkers.map((m, i) => (
+                <div key={`c${i}`} className="marker" onMouseDown={e => onMarkerDown('card', i, e)} onTouchStart={e => onMarkerDown('card', i, e)} style={{ left: `${m.x}%`, top: `${m.y}%`, color: '#FF6B6B' }}>
+                  <div className="marker-h" /><div className="marker-v" /><div className="marker-dot" />
+                </div>
+              ))}
+              {pupilMarkers.map((m, i) => (
+                <div key={`p${i}`} className="marker" onMouseDown={e => onMarkerDown('pupil', i, e)} onTouchStart={e => onMarkerDown('pupil', i, e)} style={{ left: `${m.x}%`, top: `${m.y}%`, color: '#00b8ff' }}>
+                  <div className="marker-h" /><div className="marker-v" /><div className="marker-dot" />
+                </div>
+              ))}
             </div>
-            {cardMarkers.map((m, i) => (
-              <div key={`c${i}`} className="marker" onMouseDown={e => onMarkerDown('card', i, e)} onTouchStart={e => onMarkerDown('card', i, e)} style={{ left: `${m.x}%`, top: `${m.y}%`, color: '#FF6B6B' }}>
-                <div className="marker-h" /><div className="marker-v" /><div className="marker-dot" />
-              </div>
-            ))}
-            {pupilMarkers.map((m, i) => (
-              <div key={`p${i}`} className="marker" onMouseDown={e => onMarkerDown('pupil', i, e)} onTouchStart={e => onMarkerDown('pupil', i, e)} style={{ left: `${m.x}%`, top: `${m.y}%`, color: '#00b8ff' }}>
-                <div className="marker-h" /><div className="marker-v" /><div className="marker-dot" />
-              </div>
-            ))}
           </div>
         </div>
-        <div style={{ padding: '12px 16px 28px', display: 'flex', gap: 10, flexShrink: 0, maxWidth: 480, width: '100%', alignSelf: 'center' }}>
+
+        {/* Buttons — same max-width */}
+        <div style={{ maxWidth: MAX_W, width: '100%', alignSelf: 'center', padding: '12px 16px 28px', display: 'flex', gap: 10, flexShrink: 0 }}>
           <button className="btn-secondary" onClick={retryDetect} style={{ flex: 1 }}>Ponovi</button>
           <button className="btn-primary" onClick={calculatePD} style={{ flex: 2 }}>Izračunaj PD</button>
         </div>
@@ -514,6 +532,9 @@ const PDMeasurement = () => {
 
       <Header eyeVariant={eyeVariant} />
 
+      {/* All screen content constrained to MAX_W */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', maxWidth: MAX_W, margin: '0 auto', alignSelf: 'center' }}>
+
       {/* ── LOADING ── */}
       {loading && (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20, padding: 32 }}>
@@ -527,11 +548,11 @@ const PDMeasurement = () => {
 
       {/* ── INTRO ── */}
       {step === 'intro' && !loading && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 68, paddingBottom: 48 }}>
-          <div style={{ width: 'min(320px, calc(100% - 32px))', display: 'flex', flexDirection: 'column', gap: 64, paddingBottom: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 48, paddingBottom: 48 }}>
+          <div style={{ width: 'min(320px, calc(100% - 32px))', display: 'flex', flexDirection: 'column', gap: 48, paddingBottom: 8 }}>
 
-            {/* Top: eye icon + title */}
-            <div style={{ margin: '0 51px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18 }}>
+            {/* Top: eye icon + title — 36px below header */}
+            <div style={{ marginTop: 36, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18 }}>
               <div style={{ width: 100, background: '#1f293d', padding: '9px 15px 10px 14px', border: '1px solid rgba(0,184,255,0.3)', borderRadius: 16 }}>
                 <IcoEye variant={eyeVariant} size={69} />
               </div>
@@ -608,67 +629,69 @@ const PDMeasurement = () => {
 
       {/* ── DETECTING ── */}
       {step === 'detecting' && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, fontWeight: 500 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontWeight: 500 }}>
 
-          {/* Camera viewport */}
-          <div style={{ background: '#050508', padding: '18px 12px', borderRadius: 24, alignSelf: 'stretch', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <div style={{ width: 'min(250px, 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 67 }}>
-
-              {/* Warning badges */}
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, fontSize: 12 }}>
-                {faceStatus === 'far' && (
-                  <div style={{ minHeight: 32, display: 'flex', justifyContent: 'center', padding: '9px 10px', borderRadius: 8, background: '#664700', color: '#ffd94d', fontWeight: 500 }}>
-                    ↔ Priđite kameri
-                  </div>
-                )}
-                {faceStatus === 'close' && (
-                  <div style={{ minHeight: 32, display: 'flex', padding: '9px 10px', borderRadius: 8, background: '#661414', color: '#f66', fontWeight: 500 }}>
-                    ↔ Odmaknite se malo
-                  </div>
-                )}
+          {/* Warning badges */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, fontSize: 12, minHeight: 32, padding: '0 4px' }}>
+            {faceStatus === 'far' && (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '9px 10px', borderRadius: 8, background: '#664700', color: '#ffd94d', fontWeight: 500 }}>
+                ↔ Priđite kameri
               </div>
-
-              {/* Camera + face guide */}
-              <div style={{ position: 'relative', width: '100%', aspectRatio: '3/4', overflow: 'hidden', background: '#000', borderRadius: 8 }}>
-                {/* Face guide oval */}
-                <div style={{
-                  position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -52%)',
-                  width: '65%', height: '75%', borderRadius: '50%',
-                  border: `3px dashed ${faceStatus === 'good' ? '#00b8ff' : 'rgba(255,255,255,0.25)'}`,
-                  pointerEvents: 'none', zIndex: 9, transition: 'border-color 0.3s',
-                }} />
-                {countdown !== null && (
-                  <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', fontSize: 96, fontWeight: 900, color: '#00b8ff', zIndex: 20, textShadow: '0 0 40px rgba(0,184,255,0.9)', lineHeight: 1 }}>
-                    {countdown === 0 ? '📸' : countdown}
-                  </div>
-                )}
-                <video ref={videoRef} playsInline muted />
-                <canvas ref={canvasRef} />
+            )}
+            {faceStatus === 'close' && (
+              <div style={{ display: 'flex', padding: '9px 10px', borderRadius: 8, background: '#661414', color: '#f66', fontWeight: 500 }}>
+                ↔ Odmaknite se malo
               </div>
-
-              {/* Status bar */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, color: '#fff', fontSize: 14, padding: '4px 43px' }}>
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: faceStatus === 'good' ? '#00b8ff' : '#ff4040', flexShrink: 0, boxShadow: faceStatus === 'good' ? '0 0 6px #00b8ff' : '0 0 6px #ff4040' }} />
-                <span>
-                  {!faceDetected ? 'Pozicionirajte lice'
-                    : faceStatus === 'far' ? 'Priđite kameri'
-                    : faceStatus === 'close' ? 'Odmaknite se malo'
-                    : countdown !== null ? 'Ostanite mirni...'
-                    : 'Odlično! Ostanite mirni'}
-                </span>
-              </div>
-            </div>
+            )}
           </div>
 
-          {/* Face not detected badge */}
-          {!faceDetected && cameraReady && (
-            <div style={{ width: 210, display: 'flex', justifyContent: 'center', background: '#591414', color: '#ff8080', fontSize: 13, fontWeight: 500, padding: '12px 16px', borderRadius: 20, textAlign: 'center' }}>
-              ✕&nbsp; Lice nije detektovano
+          {/* Camera — full width, 3:4 */}
+          <div style={{ position: 'relative', width: '100%', aspectRatio: '3/4', overflow: 'hidden', background: '#050508', borderRadius: 20 }}>
+            {/* Face guide oval */}
+            <div style={{
+              position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -52%)',
+              width: '65%', height: '75%', borderRadius: '50%',
+              border: `3px dashed ${faceStatus === 'good' ? '#00b8ff' : 'rgba(255,255,255,0.25)'}`,
+              pointerEvents: 'none', zIndex: 9, transition: 'border-color 0.3s',
+            }} />
+            {countdown !== null && (
+              <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', fontSize: 96, fontWeight: 900, color: '#00b8ff', zIndex: 20, textShadow: '0 0 40px rgba(0,184,255,0.9)', lineHeight: 1 }}>
+                {countdown === 0 ? '📸' : countdown}
+              </div>
+            )}
+            <video ref={videoRef} playsInline muted />
+            <canvas ref={canvasRef} />
+
+            {/* Status bar — inside camera, bottom */}
+            <div style={{
+              position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)',
+              display: 'flex', alignItems: 'center', gap: 8, zIndex: 10,
+              background: 'rgba(0,0,0,0.6)', padding: '6px 16px', borderRadius: 20,
+              color: '#fff', fontSize: 13, whiteSpace: 'nowrap',
+            }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: faceStatus === 'good' ? '#00b8ff' : '#ff4040', boxShadow: faceStatus === 'good' ? '0 0 6px #00b8ff' : '0 0 6px #ff4040' }} />
+              {!faceDetected ? 'Pozicionirajte lice'
+                : faceStatus === 'far' ? 'Priđite kameri'
+                : faceStatus === 'close' ? 'Odmaknite se malo'
+                : countdown !== null ? 'Ostanite mirni...'
+                : 'Odlično! Ostanite mirni'}
             </div>
-          )}
+
+            {/* Face not detected badge — inside camera */}
+            {!faceDetected && cameraReady && (
+              <div style={{
+                position: 'absolute', bottom: 52, left: '50%', transform: 'translateX(-50%)',
+                background: 'rgba(89,20,20,0.9)', color: '#ff8080',
+                fontSize: 13, fontWeight: 500, padding: '7px 16px', borderRadius: 20,
+                zIndex: 10, whiteSpace: 'nowrap',
+              }}>
+                ✕&nbsp; Lice nije detektovano
+              </div>
+            )}
+          </div>
 
           {/* Cancel button */}
-          <button className="btn-secondary" onClick={reset} style={{ width: 'min(320px, calc(100% - 32px))', marginTop: 16, marginBottom: 32 }}>
+          <button className="btn-secondary" onClick={reset} style={{ marginTop: 4, marginBottom: 24 }}>
             Otkaži
           </button>
         </div>
@@ -731,6 +754,8 @@ const PDMeasurement = () => {
           </p>
         </div>
       )}
+
+      </div>{/* end MAX_W wrapper */}
     </div>
   );
 };
