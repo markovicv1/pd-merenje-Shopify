@@ -4,8 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 
 const LOGO_URL = 'https://opticarka.com/cdn/shop/t/39/assets/opticarka_logo_over_stream_black.png';
 
-// kept for potential future use
-const _IcoHeaderLogo_unused = () => (
+const IcoHeaderLogo = () => (
   <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
     <g clipPath="url(#hlogo)">
       <path d="M6.01311 28.5241C6.01311 29.4072 5.25998 30.1209 4.33748 30.1209C3.41498 30.1209 2.66873 29.4066 2.66873 28.5241C2.66873 27.6416 3.41561 26.9141 4.33748 26.9141C5.25936 26.9141 6.01311 27.6347 6.01311 28.5241ZM4.81936 28.3859C4.71873 28.0172 4.42248 27.7772 4.15811 27.8497C3.89311 27.9228 3.76123 28.2791 3.86248 28.6478C3.96373 29.0166 4.25936 29.2566 4.52373 29.1841C4.78811 29.1116 4.92061 28.7547 4.81936 28.3859Z" fill="white"/>
@@ -184,9 +183,7 @@ const Header = ({ eyeVariant }) => (
       maxWidth: MAX_W, margin: '0 auto', width: '100%',
     }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
-        <div style={{ width: 32, height: 32, background: '#1f293d', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
-          <img src={LOGO_URL} alt="" style={{ width: 24, height: 24, objectFit: 'contain', filter: 'invert(1)' }} />
-        </div>
+        <IcoHeaderLogo />
         <div style={{ marginTop: 3, display: 'flex', flexDirection: 'column' }}>
           <span style={{ color: '#fff', fontSize: 15, fontWeight: 600, marginLeft: -1, marginTop: -3 }}>PD Kalkulator</span>
           <span style={{ color: '#8c8c8c', fontSize: 11, fontWeight: 400, marginLeft: -1 }}>Optičarka.com</span>
@@ -551,8 +548,8 @@ const PDMeasurement = () => {
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 48, paddingBottom: 48 }}>
           <div style={{ width: 'min(320px, calc(100% - 32px))', display: 'flex', flexDirection: 'column', gap: 48, paddingBottom: 8 }}>
 
-            {/* Top: eye icon + title — 36px below header */}
-            <div style={{ marginTop: 36, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18 }}>
+            {/* Top: eye icon + title — 54px below header */}
+            <div style={{ marginTop: 54, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18 }}>
               <div style={{ width: 100, background: '#1f293d', padding: '9px 15px 10px 14px', border: '1px solid rgba(0,184,255,0.3)', borderRadius: 16 }}>
                 <IcoEye variant={eyeVariant} size={69} />
               </div>
