@@ -365,6 +365,113 @@ const PDMeasurement = () => {
     good:  { color: 'rgba(0,212,170,0.9)',   text: '✓ Dobra pozicija' },
   };
 
+  // ── Render: ADJUST (full-width, breaks out of 500px container) ───────────
+  if (step === 'adjust' && snapshotUrl) {
+    return (
+      <div style={{
+        minHeight: '100vh', background: '#0a0a0a',
+        fontFamily: '"Space Grotesk", -apple-system, BlinkMacSystemFont, sans-serif',
+        color: '#fff', display: 'flex', flexDirection: 'column',
+      }}>
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+          * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+          .btn-primary {
+            background: linear-gradient(135deg, #00D4AA 0%, #00A388 100%);
+            border: none; padding: 16px 28px; border-radius: 12px;
+            color: #000; font-weight: 600; font-size: 16px; cursor: pointer;
+            transition: all 0.3s ease; font-family: inherit; touch-action: manipulation;
+          }
+          .btn-primary:active { transform: scale(0.98); }
+          .btn-secondary {
+            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+            padding: 14px 20px; border-radius: 10px; color: #fff;
+            font-weight: 500; font-size: 15px; cursor: pointer; font-family: inherit;
+            touch-action: manipulation;
+          }
+          .marker {
+            position: absolute; width: 32px; height: 32px;
+            cursor: grab; transform: translate(-50%, -50%);
+            touch-action: none; user-select: none;
+          }
+          .marker:active { cursor: grabbing; }
+          .marker-h, .marker-v { position: absolute; background: currentColor; }
+          .marker-h { width: 100%; height: 2px; top: 50%; left: 0; transform: translateY(-50%); }
+          .marker-v { width: 2px; height: 100%; left: 50%; top: 0; transform: translateX(-50%); }
+          .marker-dot {
+            position: absolute; width: 8px; height: 8px; border-radius: 50%;
+            border: 2px solid currentColor; top: 50%; left: 50%;
+            transform: translate(-50%, -50%); background: transparent;
+          }
+        `}</style>
+
+        {/* Legend bar */}
+        <div style={{
+          padding: '10px 16px', display: 'flex', alignItems: 'center',
+          gap: '16px', background: 'rgba(255,255,255,0.04)',
+          borderBottom: '1px solid rgba(255,255,255,0.08)', fontSize: '12px',
+        }}>
+          <span style={{ color: 'rgba(255,255,255,0.5)' }}>Prevucite markere:</span>
+          <span><span style={{ color: '#FF6B6B', marginRight: 6 }}>━</span>ivice kartice</span>
+          <span><span style={{ color: '#00D4AA', marginRight: 6 }}>━</span>zenice</span>
+        </div>
+
+        {/* Full-width photo */}
+        <div
+          ref={adjustRef}
+          onMouseMove={onContainerMove}
+          onMouseUp={onContainerUp}
+          onMouseLeave={onContainerUp}
+          onTouchMove={onContainerMove}
+          onTouchEnd={onContainerUp}
+          style={{ position: 'relative', touchAction: 'none', flex: 1 }}
+        >
+          <img
+            ref={imgRef}
+            src={snapshotUrl}
+            alt="snapshot"
+            style={{ width: '100%', display: 'block' }}
+            draggable={false}
+          />
+
+          <img
+            src="https://opticarka.com/cdn/shop/t/39/assets/opticarka_logo_over_stream_black.png"
+            alt=""
+            style={{
+              position: 'absolute', top: '10px', left: '10px',
+              width: '110px', pointerEvents: 'none', zIndex: 5,
+              filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.5))',
+            }}
+          />
+
+          {cardMarkers.map((m, i) => (
+            <div key={`card-${i}`} className="marker"
+              onMouseDown={e => onMarkerDown('card', i, e)}
+              onTouchStart={e => onMarkerDown('card', i, e)}
+              style={{ left: `${m.x}%`, top: `${m.y}%`, color: '#FF6B6B' }}>
+              <div className="marker-h" /><div className="marker-v" /><div className="marker-dot" />
+            </div>
+          ))}
+
+          {pupilMarkers.map((m, i) => (
+            <div key={`pupil-${i}`} className="marker"
+              onMouseDown={e => onMarkerDown('pupil', i, e)}
+              onTouchStart={e => onMarkerDown('pupil', i, e)}
+              style={{ left: `${m.x}%`, top: `${m.y}%`, color: '#00D4AA' }}>
+              <div className="marker-h" /><div className="marker-v" /><div className="marker-dot" />
+            </div>
+          ))}
+        </div>
+
+        {/* Buttons */}
+        <div style={{ padding: '12px 16px 24px', display: 'flex', gap: '10px' }}>
+          <button className="btn-secondary" onClick={retryDetect} style={{ flex: 1 }}>Ponovi</button>
+          <button className="btn-primary" onClick={calculatePD} style={{ flex: 2 }}>Izračunaj PD</button>
+        </div>
+      </div>
+    );
+  }
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div style={{
@@ -570,92 +677,6 @@ const PDMeasurement = () => {
           </div>
         )}
 
-        {/* ── ADJUST ── */}
-        {step === 'adjust' && snapshotUrl && (
-          <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
-            <div style={{ padding: '14px 16px 10px' }}>
-              <h2 style={{ fontSize: '17px', marginBottom: '3px' }}>Postavite markere</h2>
-              <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '12px', margin: 0 }}>
-                <span style={{ color: '#FF6B6B' }}>━━</span> ivice kartice &nbsp;|&nbsp;
-                <span style={{ color: '#00D4AA' }}>━━</span> zenice
-              </p>
-            </div>
-
-            {/* Snapshot + draggable markers */}
-            <div
-              ref={adjustRef}
-              onMouseMove={onContainerMove}
-              onMouseUp={onContainerUp}
-              onMouseLeave={onContainerUp}
-              onTouchMove={onContainerMove}
-              onTouchEnd={onContainerUp}
-              style={{ position: 'relative', touchAction: 'none' }}
-            >
-              <img
-                ref={imgRef}
-                src={snapshotUrl}
-                alt="snapshot"
-                style={{ width: '100%', display: 'block' }}
-                draggable={false}
-              />
-
-              {/* Optičarka logo overlay */}
-              <img
-                src="https://opticarka.com/cdn/shop/t/39/assets/opticarka_logo_over_stream_black.png"
-                alt=""
-                style={{
-                  position: 'absolute', top: '10px', left: '10px',
-                  width: '110px', pointerEvents: 'none', zIndex: 5,
-                  filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.5))',
-                }}
-              />
-
-              {/* Card edge markers */}
-              {cardMarkers.map((m, i) => (
-                <div
-                  key={`card-${i}`}
-                  className="marker"
-                  onMouseDown={e => onMarkerDown('card', i, e)}
-                  onTouchStart={e => onMarkerDown('card', i, e)}
-                  style={{ left: `${m.x}%`, top: `${m.y}%`, color: '#FF6B6B' }}
-                >
-                  <div className="marker-h" />
-                  <div className="marker-v" />
-                  <div className="marker-dot" />
-                </div>
-              ))}
-
-              {/* Pupil markers */}
-              {pupilMarkers.map((m, i) => (
-                <div
-                  key={`pupil-${i}`}
-                  className="marker"
-                  onMouseDown={e => onMarkerDown('pupil', i, e)}
-                  onTouchStart={e => onMarkerDown('pupil', i, e)}
-                  style={{ left: `${m.x}%`, top: `${m.y}%`, color: '#00D4AA' }}
-                >
-                  <div className="marker-h" />
-                  <div className="marker-v" />
-                  <div className="marker-dot" />
-                </div>
-              ))}
-            </div>
-
-            <div style={{ padding: '12px 16px 16px' }}>
-              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', textAlign: 'center', margin: '0 0 12px 0' }}>
-                Prevucite markere na tačne pozicije
-              </p>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button className="btn-secondary" onClick={retryDetect} style={{ flex: 1 }}>
-                  Ponovi
-                </button>
-                <button className="btn-primary" onClick={calculatePD} style={{ flex: 2 }}>
-                  Izračunaj PD
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* ── RESULT ── */}
         {step === 'result' && (
