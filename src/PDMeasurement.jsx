@@ -418,14 +418,21 @@ const PDMeasurement = () => {
           border-radius: 12px; padding: 16px;
         }
         .marker {
-          position: absolute; width: 28px; height: 28px; border-radius: 50%;
-          border: 3px solid white; display: flex; align-items: center;
-          justify-content: center; font-size: 10px; font-weight: 700;
+          position: absolute; width: 32px; height: 32px;
           cursor: grab; transform: translate(-50%, -50%);
-          touch-action: none; user-select: none; color: #fff;
-          box-shadow: 0 0 8px rgba(0,0,0,0.6);
+          touch-action: none; user-select: none;
         }
-        .marker:active { cursor: grabbing; transform: translate(-50%,-50%) scale(1.2); }
+        .marker:active { cursor: grabbing; }
+        .marker-h, .marker-v {
+          position: absolute; background: currentColor;
+        }
+        .marker-h { width: 100%; height: 2px; top: 50%; left: 0; transform: translateY(-50%); }
+        .marker-v { width: 2px; height: 100%; left: 50%; top: 0; transform: translateX(-50%); }
+        .marker-dot {
+          position: absolute; width: 8px; height: 8px; border-radius: 50%;
+          border: 2px solid currentColor; top: 50%; left: 50%;
+          transform: translate(-50%, -50%); background: transparent;
+        }
       `}</style>
 
       <div style={{ maxWidth: '500px', margin: '0 auto' }}>
@@ -566,11 +573,14 @@ const PDMeasurement = () => {
 
         {/* ── ADJUST ── */}
         {step === 'adjust' && snapshotUrl && (
-          <div className="glass-card" style={{ padding: '16px' }}>
-            <h2 style={{ fontSize: '17px', marginBottom: '4px' }}>Postavite markere</h2>
-            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', marginBottom: '12px' }}>
-              Crveni markeri — ivice kartice &nbsp;|&nbsp; Tirkizni markeri — zenice
-            </p>
+          <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '14px 16px 10px' }}>
+              <h2 style={{ fontSize: '17px', marginBottom: '3px' }}>Postavite markere</h2>
+              <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '12px', margin: 0 }}>
+                <span style={{ color: '#FF6B6B' }}>━━</span> ivice kartice &nbsp;|&nbsp;
+                <span style={{ color: '#00D4AA' }}>━━</span> zenice
+              </p>
+            </div>
 
             {/* Snapshot + draggable markers */}
             <div
@@ -580,14 +590,25 @@ const PDMeasurement = () => {
               onMouseLeave={onContainerUp}
               onTouchMove={onContainerMove}
               onTouchEnd={onContainerUp}
-              style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', touchAction: 'none' }}
+              style={{ position: 'relative', touchAction: 'none' }}
             >
               <img
                 ref={imgRef}
                 src={snapshotUrl}
                 alt="snapshot"
-                style={{ width: '100%', display: 'block', borderRadius: '12px' }}
+                style={{ width: '100%', display: 'block' }}
                 draggable={false}
+              />
+
+              {/* Optičarka logo overlay */}
+              <img
+                src="https://opticarka.com/cdn/shop/t/39/assets/opticarka_logo_over_stream_black.png"
+                alt=""
+                style={{
+                  position: 'absolute', top: '10px', left: '10px',
+                  width: '110px', pointerEvents: 'none', zIndex: 5,
+                  filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.5))',
+                }}
               />
 
               {/* Card edge markers */}
@@ -597,12 +618,11 @@ const PDMeasurement = () => {
                   className="marker"
                   onMouseDown={e => onMarkerDown('card', i, e)}
                   onTouchStart={e => onMarkerDown('card', i, e)}
-                  style={{
-                    left: `${m.x}%`, top: `${m.y}%`,
-                    background: '#FF6B6B',
-                  }}
+                  style={{ left: `${m.x}%`, top: `${m.y}%`, color: '#FF6B6B' }}
                 >
-                  {i === 0 ? '◀' : '▶'}
+                  <div className="marker-h" />
+                  <div className="marker-v" />
+                  <div className="marker-dot" />
                 </div>
               ))}
 
@@ -613,27 +633,27 @@ const PDMeasurement = () => {
                   className="marker"
                   onMouseDown={e => onMarkerDown('pupil', i, e)}
                   onTouchStart={e => onMarkerDown('pupil', i, e)}
-                  style={{
-                    left: `${m.x}%`, top: `${m.y}%`,
-                    background: '#00A388',
-                  }}
+                  style={{ left: `${m.x}%`, top: `${m.y}%`, color: '#00D4AA' }}
                 >
-                  {i === 0 ? 'L' : 'R'}
+                  <div className="marker-h" />
+                  <div className="marker-v" />
+                  <div className="marker-dot" />
                 </div>
               ))}
             </div>
 
-            <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.45)', textAlign: 'center', marginTop: '8px', marginBottom: '16px' }}>
-              Prevucite markere na tačne pozicije
-            </p>
-
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button className="btn-secondary" onClick={retryDetect} style={{ flex: 1 }}>
-                Ponovi
-              </button>
-              <button className="btn-primary" onClick={calculatePD} style={{ flex: 2 }}>
-                Izračunaj PD
-              </button>
+            <div style={{ padding: '12px 16px 16px' }}>
+              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', textAlign: 'center', margin: '0 0 12px 0' }}>
+                Prevucite markere na tačne pozicije
+              </p>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button className="btn-secondary" onClick={retryDetect} style={{ flex: 1 }}>
+                  Ponovi
+                </button>
+                <button className="btn-primary" onClick={calculatePD} style={{ flex: 2 }}>
+                  Izračunaj PD
+                </button>
+              </div>
             </div>
           </div>
         )}
