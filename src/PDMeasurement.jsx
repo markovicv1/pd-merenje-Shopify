@@ -486,9 +486,10 @@ const PDMeasurement = () => {
               style={{ position: 'relative', touchAction: 'none', aspectRatio: '3/4', height: '100%', maxWidth: '100%' }}
             >
               <img ref={imgRef} src={snapshotUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} draggable={false} />
-              <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 5, pointerEvents: 'none', background: 'rgba(255,255,255,0.92)', borderRadius: 8, padding: '4px 10px' }}>
-                <img src={LOGO_URL} alt="" style={{ width: 90, display: 'block' }} />
-              </div>
+              <img src={LOGO_URL} alt="" style={{
+                position: 'absolute', top: 10, left: 10, zIndex: 5, pointerEvents: 'none',
+                width: 90, filter: 'invert(1) drop-shadow(0 1px 4px rgba(0,0,0,0.6))',
+              }} />
               {cardMarkers.map((m, i) => (
                 <div key={`c${i}`} className="marker" onMouseDown={e => onMarkerDown('card', i, e)} onTouchStart={e => onMarkerDown('card', i, e)} style={{ left: `${m.x}%`, top: `${m.y}%`, color: '#FF6B6B' }}>
                   <div className="marker-h" /><div className="marker-v" /><div className="marker-dot" />
