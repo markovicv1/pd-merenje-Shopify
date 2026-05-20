@@ -170,6 +170,19 @@ const GLOBAL_CSS = `
   .marker-h { width: 100%; height: 2px; top: 50%; left: 0; transform: translateY(-50%); }
   .marker-v { width: 2px; height: 100%; left: 50%; top: 0; transform: translateX(-50%); }
   .marker-dot { position: absolute; width: 8px; height: 8px; border-radius: 50%; border: 2px solid currentColor; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+
+  .pd-adjust-hint { position: absolute; top: 22%; left: 50%; transform: translateX(-50%); text-align: center; max-width: 84%; color: #fff; pointer-events: none; opacity: 0.85; text-shadow: 0 2px 8px rgba(0,0,0,0.7), 0 0 16px rgba(0,0,0,0.4); z-index: 6; transition: opacity 0.4s ease-out, visibility 0s linear 0.4s; }
+  .pd-adjust-hint.is-hidden { opacity: 0; visibility: hidden; }
+  .pd-adjust-hint__big { font-size: 28px; font-weight: 800; line-height: 1.1; letter-spacing: -0.02em; }
+  .pd-adjust-hint__small { margin-top: 6px; font-size: 16px; font-weight: 500; line-height: 1.3; letter-spacing: -0.005em; }
+  @media (min-width: 480px) {
+    .pd-adjust-hint__big { font-size: 32px; }
+    .pd-adjust-hint__small { font-size: 18px; }
+  }
+  @media (min-width: 1024px) {
+    .pd-adjust-hint__big { font-size: 36px; }
+    .pd-adjust-hint__small { font-size: 19px; }
+  }
 `;
 
 const MAX_W = 420;
@@ -231,6 +244,7 @@ const PDMeasurement = () => {
   const [snapshotUrl, setSnapshotUrl]     = useState(null);
   const [showManualCopy, setShowManualCopy] = useState(false);
   const [eyeVariant, setEyeVariant]       = useState('open');
+  const [showAdjustHint, setShowAdjustHint] = useState(true);
 
   const [cardMarkers, setCardMarkers]   = useState([{ x: 12, y: 68 }, { x: 88, y: 68 }]);
   const [pupilMarkers, setPupilMarkers] = useState([{ x: 38, y: 42 }, { x: 62, y: 42 }]);
@@ -399,6 +413,14 @@ const PDMeasurement = () => {
     return () => cancelAnimationFrame(animationRef.current);
   }, [cameraReady, faceMesh, step, detectFace]);
 
+  // ── Adjust: instrukcija "Pomaknite crvene markere…" auto-dismiss 3s + 0.4s fade
+  useEffect(() => {
+    if (step !== 'adjust') return;
+    setShowAdjustHint(true);
+    const t = setTimeout(() => setShowAdjustHint(false), 3400);
+    return () => clearTimeout(t);
+  }, [step]);
+
   // ── Adjust: dragging ───────────────────────────────────────────────────
   const getMarkerPct = (e) => {
     const el = adjustRef.current; if (!el) return null;
@@ -407,7 +429,7 @@ const PDMeasurement = () => {
     const cy = e.touches ? e.touches[0].clientY : e.clientY;
     return { x: Math.max(0, Math.min(100, (cx - rect.left) / rect.width * 100)), y: Math.max(0, Math.min(100, (cy - rect.top) / rect.height * 100)) };
   };
-  const onMarkerDown = (group, index, e) => { e.stopPropagation(); e.preventDefault(); draggingRef.current = { group, index }; };
+  const onMarkerDown = (group, index, e) => { e.stopPropagation(); e.preventDefault(); draggingRef.current = { group, index }; setShowAdjustHint(false); };
   const onMove = (e) => {
     if (!draggingRef.current) return; e.preventDefault();
     const pct = getMarkerPct(e); if (!pct) return;
@@ -500,6 +522,10 @@ const PDMeasurement = () => {
                   <div className="marker-h" /><div className="marker-v" /><div className="marker-dot" />
                 </div>
               ))}
+              <div className={`pd-adjust-hint${showAdjustHint ? '' : ' is-hidden'}`} aria-live="polite">
+                <div className="pd-adjust-hint__big">Pomaknite crvene markere</div>
+                <div className="pd-adjust-hint__small">na levu i desnu ivicu kartice</div>
+              </div>
             </div>
           </div>
         </div>
