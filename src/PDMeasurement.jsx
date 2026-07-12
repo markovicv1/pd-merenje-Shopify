@@ -282,7 +282,7 @@ const PDMeasurement = () => {
     (async () => {
       setLoading(true);
       const tryLoad = async (delegate) => {
-        const mp = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/vision_bundle.js');
+        const mp = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/vision_bundle.mjs');
         const vision = await mp.FilesetResolver.forVisionTasks(
           'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm'
         );
