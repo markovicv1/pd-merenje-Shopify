@@ -114,7 +114,6 @@ const IcoResultHeader = () => (
 );
 
 // ── Constants ─────────────────────────────────────────────────────────────
-const CREDIT_CARD_WIDTH_MM = 85.6;
 const LEFT_IRIS   = 468;
 const RIGHT_IRIS  = 473;
 const HISTORY_SIZE    = 25;
@@ -245,6 +244,7 @@ const PDMeasurement = () => {
   const [countdown, setCountdown]         = useState(null);
   const [snapshotUrl, setSnapshotUrl]     = useState(null);
   const [showManualCopy, setShowManualCopy] = useState(false);
+  const [copyOk, setCopyOk]               = useState(false);
   const [eyeVariant, setEyeVariant]       = useState('open');
   const [showAdjustHint, setShowAdjustHint] = useState(true);
 
@@ -463,33 +463,59 @@ const PDMeasurement = () => {
   const onUp = () => { draggingRef.current = null; };
 
   // ── PD calc ────────────────────────────────────────────────────────────
+  const formatPd = (v) => v.toLocaleString('sr-RS', { maximumFractionDigits: 1 });
+
   const calculatePD = () => {
     const el = adjustRef.current; if (!el) return;
     const dw = el.clientWidth, dh = el.clientHeight;
     const px = (pct, d) => pct / 100 * d;
     const dist = (a, b) => Math.sqrt((px(a.x, dw) - px(b.x, dw)) ** 2 + (px(a.y, dh) - px(b.y, dh)) ** 2);
     const cardPx = dist(cardMarkers[0], cardMarkers[1]);
-    if (cardPx < 10) { setError('Postavite markere kartica dalje jedan od drugog.'); return; }
-    const rawPd = Math.round(dist(pupilMarkers[0], pupilMarkers[1]) * (CREDIT_CARD_WIDTH_MM / cardPx));
-    const displayPd = source === 'vto' ? Math.max(48, Math.min(80, rawPd)) : rawPd;
-    if (source === 'vto' ? (rawPd < 48 || rawPd > 80) : (rawPd < 40 || rawPd > 80.5))
-      setError(`Vrednost (${rawPd}mm) je van opsega. Proverite markere ili ponovite merenje.`);
-    setFinalPD(displayPd); setStep('result');
+    if (cardPx < 10) { setError('Postavite markere kartice dalje jedan od drugog.'); return; }
+
+    const rawPd = dist(pupilMarkers[0], pupilMarkers[1]) * (CARD_WIDTH_MM / cardPx);
+    const cardPosition = classifyCardPosition(
+      (cardMarkers[0].y + cardMarkers[1].y) / 2,
+      (pupilMarkers[0].y + pupilMarkers[1].y) / 2,
+    );
+    const pd = computeCorrectedPd({
+      rawPdMm: rawPd,
+      distanceMm: captureDistanceRef.current,
+      cardPosition,
+    });
+
+    const [min, max] = source === 'vto' ? [48, 80] : [40, 80.5];
+    if (pd < min || pd > max) {
+      // Van opsega → korisnik ostaje na adjust koraku i popravlja markere. Bez tihog clamp-a.
+      setError(`Vrednost (${formatPd(pd)} mm) je van opsega ${min}–${max} mm. Pomerite markere na ivice kartice i centre zenica, pa pokušajte ponovo.`);
+      return;
+    }
+    setError(null);
+    setFinalPD(pd); setStep('result');
   };
 
   // ── Return value ───────────────────────────────────────────────────────
-  const returnValue = (pd) => {
-    navigator.clipboard?.writeText(String(pd)).catch(() => {});
+  const returnValue = async (pd) => {
+    const pdForVto = Math.round(pd); // VTO dropdown radi u celim mm
+
+    let clipboardOk = false;
+    try { await navigator.clipboard?.writeText(String(pd)); clipboardOk = true; } catch {}
+
     const openerAlive = window.opener && !window.opener.closed;
     if (openerAlive) {
-      try { window.opener.postMessage({ type: 'PD_RESULT', value: pd }, '*'); } catch {}
+      // targetOrigin ograničen na allowlist — poruka stiže samo Optičarkinim stranicama
+      for (const origin of ALLOWED_ORIGINS) {
+        try { window.opener.postMessage({ type: 'PD_RESULT', value: pdForVto }, origin); } catch {}
+      }
       setTimeout(() => window.close(), 300); return;
     }
-    if (source === 'vto' && returnUrl) {
-      const url = new URL(decodeURIComponent(returnUrl));
-      url.searchParams.set('pd', pd); url.searchParams.set('reopenVTO', '1');
-      window.location.href = url.toString(); return;
+    const target = resolveReturnTarget(returnUrl); // bez decodeURIComponent — get() je već dekodirao
+    if (source === 'vto' && target) {
+      target.searchParams.set('pd', String(pdForVto));
+      target.searchParams.set('reopenVTO', '1');
+      window.location.href = target.toString(); return;
     }
+    setCopyOk(clipboardOk);
     setShowManualCopy(true);
   };
 
@@ -498,8 +524,9 @@ const PDMeasurement = () => {
     cancelAnimationFrame(animationRef.current);
     videoRef.current?.srcObject?.getTracks().forEach(t => t.stop());
     setStep('intro'); setCameraReady(false); setFaceDetected(false); setFaceStatus('none');
-    setCountdown(null); setSnapshotUrl(null); setFinalPD(null); setShowManualCopy(false);
+    setCountdown(null); setSnapshotUrl(null); setFinalPD(null); setShowManualCopy(false); setCopyOk(false);
     faceHistoryRef.current = []; cntdwnStartRef.current = null; lastTimeRef.current = -1;
+    captureDistanceRef.current = null;
   };
   const retryDetect = () => {
     faceHistoryRef.current = []; cntdwnStartRef.current = null; setCountdown(null); lastTimeRef.current = -1;
@@ -514,6 +541,15 @@ const PDMeasurement = () => {
     return (
       <div style={{ minHeight: '100vh', background: '#171f2e', fontFamily: 'Inter, sans-serif', color: '#fff', display: 'flex', flexDirection: 'column' }}>
         <style>{GLOBAL_CSS}</style>
+
+        {/* Error banner (npr. vrednost van opsega) */}
+        {error && (
+          <div style={{ background: 'rgba(200,40,40,0.15)', borderBottom: '1px solid rgba(200,40,40,0.3)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexShrink: 0 }}>
+            <span style={{ color: '#ff8080', fontSize: 14 }}>{error}</span>
+            <button onClick={() => setError(null)} style={{ color: 'rgba(255,255,255,0.5)', fontSize: 18, padding: '0 4px' }}>✕</button>
+          </div>
+        )}
+
         <Header eyeVariant={eyeVariant} />
 
         {/* Legend — same max-width as content */}
@@ -625,7 +661,7 @@ const PDMeasurement = () => {
                       <IcoCardGraphic />
                     </div>
                   </BlueCell>
-                  <span>Držite karticu na vrhu nosa ili čela</span>
+                  <span>Karticu držite ravno na čelu ili vrhu nosa, paralelno sa ekranom</span>
                 </div>
 
                 {/* Row 2: gledajte u kameru */}
@@ -770,7 +806,7 @@ const PDMeasurement = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, textAlign: 'center', background: '#222', padding: '31px 23px', border: '1px solid rgba(0,184,255,0.2)', borderRadius: 20, color: '#999' }}>
               <p style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.455, letterSpacing: '1.09px', textTransform: 'uppercase' }}>Vaše PD rastojanje</p>
               <div style={{ width: 165, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', alignSelf: 'center' }}>
-                <span style={{ color: '#00b8ff', fontSize: 80, fontWeight: 700, lineHeight: 1.1 }}>{finalPD}</span>
+                <span style={{ color: '#00b8ff', fontSize: Number.isInteger(finalPD) ? 80 : 64, fontWeight: 700, lineHeight: 1.1 }}>{formatPd(finalPD)}</span>
                 <span style={{ color: '#666', fontSize: 28, fontWeight: 600, lineHeight: 3.143 }}>mm</span>
               </div>
               <p style={{ fontSize: 13, fontWeight: 400 }}>Normalan opseg: 48–80 mm</p>
@@ -790,7 +826,11 @@ const PDMeasurement = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: 16, lineHeight: 1.5 }}>
               {showManualCopy ? (
                 <>
-                  <p style={{ fontSize: 13, color: '#8c8c8c', textAlign: 'center' }}>Kopirano u clipboard. Zatvorite ovaj tab i unesite vrednost ručno.</p>
+                  <p style={{ fontSize: 13, color: '#8c8c8c', textAlign: 'center' }}>
+                    {copyOk
+                      ? 'Vrednost je kopirana u clipboard. Zatvorite ovaj tab i nalepite je gde je potrebno.'
+                      : `Zabeležite vrednost: ${formatPd(finalPD)} mm — unesite je ručno.`}
+                  </p>
                   <button className="btn-secondary" onClick={() => window.close()}>Zatvori tab</button>
                 </>
               ) : (
