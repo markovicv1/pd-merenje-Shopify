@@ -1,21 +1,22 @@
 {
-  "name": "pd-vercel",
-  "version": "1.0.1",
-  "description": "",
-  "main": "index.js",
+  "name": "pd-kalkulator",
+  "version": "1.1.0",
+  "description": "Optičarka PD kalkulator — online merenje pupilarne distance",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run"
   },
-  "keywords": [],
-  "author": "",
   "license": "ISC",
   "dependencies": {
-    "@vitejs/plugin-react": "^5.1.2",
     "react": "^19.2.3",
-    "react-dom": "^19.2.3",
+    "react-dom": "^19.2.3"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.1.2",
+    "terser": "^5.31.0",
     "vite": "^7.3.0",
-    "terser": "^5.31.0"
+    "vitest": "^4.1.10"
   }
 }
