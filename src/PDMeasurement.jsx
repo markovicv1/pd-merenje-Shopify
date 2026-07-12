@@ -1,4 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { median, computeCorrectedPd, classifyCardPosition, CARD_WIDTH_MM } from './lib/pdMath.js';
+import { decomposeFacialMatrix, isPoseFrontal } from './lib/headPose.js';
+import { resolveReturnTarget, ALLOWED_ORIGINS } from './lib/returnTarget.js';
 
 // ── Inline SVGs from Figma export ─────────────────────────────────────────
 
@@ -127,7 +130,6 @@ function stddev(arr) {
 
 // ── Shared CSS ────────────────────────────────────────────────────────────
 const GLOBAL_CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
   *, *::before, *::after { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; border: 0; }
   html { height: 100%; font-size: 16px; }
   body { min-height: 100%; font-family: 'Inter', sans-serif; overflow: auto; }
@@ -279,9 +281,9 @@ const PDMeasurement = () => {
     (async () => {
       setLoading(true);
       const tryLoad = async (delegate) => {
-        const mp = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.js');
+        const mp = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/vision_bundle.js');
         const vision = await mp.FilesetResolver.forVisionTasks(
-          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
+          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm'
         );
         return mp.FaceLandmarker.createFromOptions(vision, {
           baseOptions: {
