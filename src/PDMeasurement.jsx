@@ -256,6 +256,7 @@ const PDMeasurement = () => {
   const faceHistoryRef = useRef([]);
   const cntdwnStartRef = useRef(null);
   const draggingRef    = useRef(null);
+  const captureDistanceRef = useRef(null); // udaljenost kamere (mm) u trenutku snimka
 
   const urlParams = useRef((() => {
     const p = new URLSearchParams(window.location.search);
@@ -291,7 +292,7 @@ const PDMeasurement = () => {
             delegate,
           },
           runningMode: 'VIDEO', numFaces: 1,
-          outputFaceBlendshapes: false, outputFacialTransformationMatrixes: false,
+          outputFaceBlendshapes: false, outputFacialTransformationMatrixes: true,
         });
       };
       try {
@@ -369,11 +370,15 @@ const PDMeasurement = () => {
       ctx.beginPath(); ctx.moveTo(lX, lY); ctx.lineTo(rX, rY); ctx.stroke();
       ctx.setLineDash([]);
 
-      const status = irisD < MIN_IRIS_PX ? 'far' : irisD > MAX_IRIS_PX ? 'close' : 'good';
+      const matrixData = results.facialTransformationMatrixes?.[0]?.data;
+      const pose = matrixData ? decomposeFacialMatrix(matrixData) : null;
+      const poseOk = !pose || isPoseFrontal(pose);
+
+      const status = irisD < MIN_IRIS_PX ? 'far' : irisD > MAX_IRIS_PX ? 'close' : !poseOk ? 'pose' : 'good';
       setFaceStatus(status);
 
       const hist = faceHistoryRef.current;
-      hist.push({ lX, rX });
+      hist.push({ lX, lY, rX, rY, distanceMm: pose?.distanceMm ?? NaN });
       if (hist.length > HISTORY_SIZE) hist.shift();
       const isStill = hist.length >= HISTORY_SIZE
         && stddev(hist.map(h => h.lX)) < STILL_THRESHOLD
@@ -386,6 +391,12 @@ const PDMeasurement = () => {
 
         if (elapsed >= COUNTDOWN_MS) {
           cancelAnimationFrame(animationRef.current); ctx.restore();
+          // Median pozicija zenica kroz 25 frejmova mirovanja — manji jitter landmarka
+          const mLX = median(hist.map(h => h.lX)), mLY = median(hist.map(h => h.lY));
+          const mRX = median(hist.map(h => h.rX)), mRY = median(hist.map(h => h.rY));
+          const dSamples = hist.map(h => h.distanceMm).filter(Number.isFinite);
+          captureDistanceRef.current = dSamples.length ? median(dSamples) : null;
+
           const vW = video.videoWidth, vH = video.videoHeight;
           const ta = 3 / 4;
           let srcX, srcY, srcW, srcH;
@@ -398,9 +409,13 @@ const PDMeasurement = () => {
           sc.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, snap.width, snap.height);
           sc.restore();
           setSnapshotUrl(snap.toDataURL('image/jpeg', 0.92));
+          // Kamera se gasi čim je slika uhvaćena (privatnost + baterija)
+          video.srcObject?.getTracks().forEach(t => t.stop());
+          video.srcObject = null;
+          setCameraReady(false);
           setPupilMarkers([
-            { x: ((1 - lIris.x) * vW - srcX) / srcW * 100, y: (lIris.y * vH - srcY) / srcH * 100 },
-            { x: ((1 - rIris.x) * vW - srcX) / srcW * 100, y: (rIris.y * vH - srcY) / srcH * 100 },
+            { x: ((vW - mLX) - srcX) / srcW * 100, y: (mLY - srcY) / srcH * 100 },
+            { x: ((vW - mRX) - srcX) / srcW * 100, y: (mRY - srcY) / srcH * 100 },
           ]);
           setCardMarkers([{ x: 12, y: 70 }, { x: 88, y: 70 }]);
           setCountdown(null); setStep('adjust'); return;
@@ -414,6 +429,12 @@ const PDMeasurement = () => {
     if (cameraReady && faceMesh && step === 'detecting') { lastTimeRef.current = -1; detectFace(); }
     return () => cancelAnimationFrame(animationRef.current);
   }, [cameraReady, faceMesh, step, detectFace]);
+
+  // ── Cleanup na unmount: MediaPipe graf i kamera ────────────────────────
+  useEffect(() => () => { faceMesh?.close?.(); }, [faceMesh]);
+  useEffect(() => () => {
+    videoRef.current?.srcObject?.getTracks().forEach(t => t.stop());
+  }, []);
 
   // ── Adjust: instrukcija "Pomaknite crvene markere…" auto-dismiss 3s + 0.4s fade
   useEffect(() => {
@@ -481,7 +502,9 @@ const PDMeasurement = () => {
     faceHistoryRef.current = []; cntdwnStartRef.current = null; lastTimeRef.current = -1;
   };
   const retryDetect = () => {
-    setStep('detecting'); faceHistoryRef.current = []; cntdwnStartRef.current = null; setCountdown(null); lastTimeRef.current = -1;
+    faceHistoryRef.current = []; cntdwnStartRef.current = null; setCountdown(null); lastTimeRef.current = -1;
+    captureDistanceRef.current = null;
+    setSnapshotUrl(null); setStep('detecting'); startCamera();
   };
 
   // ══════════════════════════════════════════════════════════════════════
@@ -669,6 +692,11 @@ const PDMeasurement = () => {
                 ↔ Odmaknite se malo
               </div>
             )}
+            {faceStatus === 'pose' && (
+              <div style={{ display: 'flex', padding: '9px 10px', borderRadius: 8, background: '#664700', color: '#ffd94d', fontWeight: 500 }}>
+                ↻ Ispravite glavu, pogled pravo u kameru
+              </div>
+            )}
           </div>
 
           {/* Camera — full width, 3:4 */}
@@ -699,6 +727,7 @@ const PDMeasurement = () => {
               {!faceDetected ? 'Pozicionirajte lice'
                 : faceStatus === 'far' ? 'Priđite kameri'
                 : faceStatus === 'close' ? 'Odmaknite se malo'
+                : faceStatus === 'pose' ? 'Ispravite glavu, pogled pravo u kameru'
                 : countdown !== null ? 'Ostanite mirni...'
                 : 'Odlično! Ostanite mirni'}
             </div>
