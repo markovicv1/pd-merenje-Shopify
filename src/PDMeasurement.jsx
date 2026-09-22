@@ -245,6 +245,7 @@ const PDMeasurement = () => {
   const [snapshotUrl, setSnapshotUrl]     = useState(null);
   const [showManualCopy, setShowManualCopy] = useState(false);
   const [copyOk, setCopyOk]               = useState(false);
+  const [sentToParent, setSentToParent]   = useState(false); // ?embed=vizor — poslato u konfigurator
   const [eyeVariant, setEyeVariant]       = useState('open');
   const [showAdjustHint, setShowAdjustHint] = useState(true);
 
@@ -260,9 +261,11 @@ const PDMeasurement = () => {
 
   const urlParams = useRef((() => {
     const p = new URLSearchParams(window.location.search);
-    return { source: p.get('source'), returnUrl: p.get('return') };
+    return { source: p.get('source'), returnUrl: p.get('return'), embed: p.get('embed') };
   })());
-  const { source, returnUrl } = urlParams.current;
+  const { source, returnUrl, embed } = urlParams.current;
+  // Vizor konfigurator ugrađuje kalkulator u iframe (?embed=vizor) i sluša rezultat.
+  const inIframe = typeof window !== 'undefined' && window.parent && window.parent !== window;
 
   // ── Eye blink ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -500,6 +503,17 @@ const PDMeasurement = () => {
 
     let clipboardOk = false;
     try { await navigator.clipboard?.writeText(String(pd)); clipboardOk = true; } catch {}
+
+    // Ugrađen u Vizor (iframe): vrednost ide roditeljskoj stranici, sa 0,5 mm preciznošću
+    // koju polje PD u konfiguratoru nudi. Tab se ne zatvara — iframe nema svoj prozor.
+    if (inIframe && embed === 'vizor') {
+      const pdHalf = Math.round(pd * 2) / 2;
+      for (const origin of ALLOWED_ORIGINS) {
+        try { window.parent.postMessage({ type: 'vizor:pd', pd: pdHalf }, origin); } catch {}
+      }
+      setSentToParent(true);
+      return;
+    }
 
     const openerAlive = window.opener && !window.opener.closed;
     if (openerAlive) {
@@ -824,7 +838,14 @@ const PDMeasurement = () => {
 
             {/* Buttons */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: 16, lineHeight: 1.5 }}>
-              {showManualCopy ? (
+              {sentToParent ? (
+                <>
+                  <p style={{ fontSize: 13, color: '#8c8c8c', textAlign: 'center' }}>
+                    Vrednost {formatPd(finalPD)} mm je upisana u vaš recept u konfiguratoru.
+                  </p>
+                  <button className="btn-secondary" onClick={() => { setSentToParent(false); reset(); }}>Izmeri ponovo</button>
+                </>
+              ) : showManualCopy ? (
                 <>
                   <p style={{ fontSize: 13, color: '#8c8c8c', textAlign: 'center' }}>
                     {copyOk
@@ -836,7 +857,7 @@ const PDMeasurement = () => {
               ) : (
                 <>
                   <button className="btn-primary" onClick={() => returnValue(finalPD)}>
-                    {source === 'vto' ? 'Vrati u Optičarku' : source === 'lool' ? 'Sačuvaj i vrati se' : 'Kopiraj vrednost'}
+                    {embed === 'vizor' ? 'Upiši u konfigurator' : source === 'vto' ? 'Vrati u Optičarku' : source === 'lool' ? 'Sačuvaj i vrati se' : 'Kopiraj vrednost'}
                   </button>
                   <button className="btn-secondary" onClick={reset}>Izmeri ponovo</button>
                 </>
