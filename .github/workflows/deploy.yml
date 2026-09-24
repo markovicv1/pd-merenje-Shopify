@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      test_ref:
+        description: 'Grana za test verziju (/test/)'
+        required: false
+        default: 'claude/happy-mendel-t00n04'
 
 permissions:
   contents: read
@@ -32,6 +37,26 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      # Test verzija na /pd-merenje-Shopify/test/ — ne utiče na produkciju; ako grana ne postoji, preskače se
+      - name: Checkout test grane
+        id: test_checkout
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.test_ref || 'claude/happy-mendel-t00n04' }}
+          path: test-src
+
+      - name: Build test verzije
+        if: steps.test_checkout.outcome == 'success'
+        continue-on-error: true
+        working-directory: test-src
+        env:
+          VITE_BASE: /pd-merenje-Shopify/test/
+        run: |
+          npm install
+          npx vite build --outDir ../dist/test --emptyOutDir
+          sed -i 's#<head>#<head><meta name="robots" content="noindex">#' ../dist/test/index.html
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
