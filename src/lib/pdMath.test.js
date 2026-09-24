@@ -58,3 +58,8 @@ describe('computeCorrectedPd (kompozicija + 0.5mm)', () => {
   it('nevalidna udaljenost koristi default 450', () =>
     expect(computeCorrectedPd({ rawPdMm: 60, distanceMm: NaN, cardPosition: 'nose' })).toBe(64));
 });
+
+describe('computeCorrectedPd bez konvergencije (fantom)', () => {
+  it('čelo, 60mm, d=400 → samo paralaksa 61.5', () =>
+    expect(computeCorrectedPd({ rawPdMm: 60, distanceMm: 400, cardPosition: 'forehead', includeVergence: false })).toBe(61.5));
+});

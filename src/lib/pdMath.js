@@ -39,7 +39,9 @@ export function correctVergence(pdMm, distanceMm) {
   return pdMm * (1 + EYE_ROTATION_OFFSET_MM / distanceMm);
 }
 
-export function computeCorrectedPd({ rawPdMm, distanceMm, cardPosition }) {
+// includeVergence: false samo za fantom (odštampane oči ne konvergiraju).
+export function computeCorrectedPd({ rawPdMm, distanceMm, cardPosition, includeVergence = true }) {
   const d = sanitizeDistanceMm(distanceMm);
-  return roundToHalfMm(correctVergence(correctParallax(rawPdMm, d, cardPosition), d));
+  const pd = correctParallax(rawPdMm, d, cardPosition);
+  return roundToHalfMm(includeVergence ? correctVergence(pd, d) : pd);
 }

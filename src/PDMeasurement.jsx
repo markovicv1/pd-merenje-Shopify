@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { median, computeCorrectedPd, classifyCardPosition, CARD_WIDTH_MM } from './lib/pdMath.js';
 import { decomposeFacialMatrix, isPoseFrontal } from './lib/headPose.js';
 import { resolveReturnTarget, ALLOWED_ORIGINS } from './lib/returnTarget.js';
+import { parseDebugFlags, irisDiameterPx, buildReport, IRIS_H_EDGES } from './lib/debugReport.js';
 
 // ── Inline SVGs from Figma export ─────────────────────────────────────────
 
@@ -225,6 +226,77 @@ const BlueCell = ({ children, style }) => (
   </div>
 );
 
+// ── Debug (?debug=1) ──────────────────────────────────────────────────────
+const DBG_BOX = {
+  fontFamily: 'ui-monospace, Menlo, Consolas, monospace', fontSize: 11, lineHeight: 1.45,
+  color: '#9fe870', background: 'rgba(0,0,0,0.78)', borderRadius: 8, padding: '8px 10px',
+};
+const fmt = (v, d = 1) => (Number.isFinite(v) ? v.toFixed(d) : '–');
+
+const DebugOverlay = ({ live, camera, delegate, phantom }) => (
+  <div style={{ ...DBG_BOX, position: 'absolute', top: 8, left: 8, zIndex: 15, pointerEvents: 'none', whiteSpace: 'pre' }}>
+    {`DEBUG${phantom ? ' · FANTOM' : ''} · ${delegate ?? '?'}
+cam ${camera?.width ?? '?'}×${camera?.height ?? '?'} @${fmt(camera?.frameRate, 0)}
+frame ${live ? `${live.w}×${live.h}` : '–'} · ${fmt(live?.fps, 0)} fps
+IPD ${fmt(live?.ipdPx)} px (${fmt(live?.ipdPct)}% š.)
+d(MP) ${fmt(live?.dMm, 0)} mm
+yaw ${fmt(live?.yaw)}° pitch ${fmt(live?.pitch)}°
+status ${live?.status ?? '–'}`}
+  </div>
+);
+
+const DebugPanel = ({ report, phantom }) => {
+  const [msg, setMsg] = useState('');
+  if (!report) {
+    return (
+      <div style={{ ...DBG_BOX, margin: '0 16px 24px', alignSelf: 'center', maxWidth: MAX_W - 32 }}>
+        DEBUG{phantom ? ' · FANTOM (bez konvergencije)' : ''} — izveštaj se pravi klikom na „Izračunaj PD".
+      </div>
+    );
+  }
+  const m = report.measurement, c = report.capture, cam = report.camera;
+  const json = JSON.stringify(report, null, 2);
+  const rows = [
+    ['kamera', `${cam.width ?? '?'}×${cam.height ?? '?'} ${cam.delegate ?? ''}`],
+    ['isečak', c.crop ? `${c.crop.w}×${c.crop.h}` : '–'],
+    ['kartica', `${fmt(m.cardSrcPx)} px · ${fmt(m.mmPerPx, 3)} mm/px`],
+    ['zenice', `${fmt(m.pupilSrcPx)} px · pomereno ${fmt(m.pupilPrefillShiftPx)} px`],
+    ['pozicija', m.cardPosition],
+    ['d (MP)', `${m.distanceMpMm ?? '–'} mm${m.distanceSanitized ? ` → ${m.distanceUsedMm} (default)` : ''}`],
+    ['poza', `yaw ${c.yawDeg ?? '–'}° pitch ${c.pitchDeg ?? '–'}° · jitter ${c.pupilJitterPx ?? '–'} px`],
+    ['PD sirovi', `${fmt(m.rawPdMm, 2)} mm`],
+    ['× paralaksa', fmt(m.parallaxFactor, 4)],
+    ['× konvergencija', fmt(m.vergenceFactor, 4)],
+    ['PD korig.', `${fmt(m.correctedPdMm, 2)} → ${m.finalPdMm ?? 'van opsega'}`],
+    ['šarenica', m.irisDiameterMm.map(v => `${fmt(v)} mm`).join(' / ')],
+  ];
+  const download = () => {
+    const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = `pd-debug-${report.timestamp.replace(/[:.]/g, '-')}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(json); setMsg('Kopirano'); } catch { setMsg('Kopiranje nije uspelo'); }
+  };
+  return (
+    <div style={{ ...DBG_BOX, margin: '0 16px 24px', alignSelf: 'center', width: 'calc(100% - 32px)', maxWidth: MAX_W - 32 }}>
+      <div style={{ fontWeight: 700, marginBottom: 6 }}>DEBUG{report.mode === 'fantom' ? ' · FANTOM' : ''}</div>
+      {rows.map(([k, v]) => (
+        <div key={k} style={{ display: 'flex', gap: 8 }}>
+          <span style={{ color: '#8c8c8c', minWidth: 110 }}>{k}</span><span>{v}</span>
+        </div>
+      ))}
+      <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
+        <button onClick={download} style={{ border: '1px solid #9fe870', borderRadius: 6, padding: '4px 10px' }}>Preuzmi JSON</button>
+        <button onClick={copy} style={{ border: '1px solid #9fe870', borderRadius: 6, padding: '4px 10px' }}>Kopiraj JSON</button>
+        <span>{msg}</span>
+      </div>
+    </div>
+  );
+};
+
 // ── PDMeasurement ─────────────────────────────────────────────────────────
 const PDMeasurement = () => {
   const videoRef  = useRef(null);
@@ -258,6 +330,16 @@ const PDMeasurement = () => {
   const cntdwnStartRef = useRef(null);
   const draggingRef    = useRef(null);
   const captureDistanceRef = useRef(null); // udaljenost kamere (mm) u trenutku snimka
+
+  // ── Debug režim (?debug=1, &fantom=1) — bez uticaja na ponašanje kad je isključen
+  const { debug, phantom } = useRef(parseDebugFlags(window.location.search)).current;
+  const delegateRef     = useRef(null);
+  const cameraInfoRef   = useRef({});
+  const captureMetaRef  = useRef(null);
+  const prefillPupilsRef = useRef(null);
+  const dbgTickRef      = useRef({ frames: 0, since: 0 });
+  const [liveDbg, setLiveDbg] = useState(null);
+  const [report, setReport]   = useState(null);
 
   const urlParams = useRef((() => {
     const p = new URLSearchParams(window.location.search);
@@ -301,11 +383,13 @@ const PDMeasurement = () => {
       try {
         setLoadingStatus('Učitavanje MediaPipe biblioteke...');
         const fl = await tryLoad('GPU');
+        delegateRef.current = 'GPU';
         if (!cancelled) { setFaceMesh(fl); setLoading(false); setLoadingStatus(''); }
       } catch (err) {
         try {
           setLoadingStatus('Pokušavam CPU režim...');
           const fl = await tryLoad('CPU');
+          delegateRef.current = 'CPU';
           if (!cancelled) { setFaceMesh(fl); setLoading(false); setLoadingStatus(''); }
         } catch {
           if (!cancelled) { setError(`Greška pri učitavanju. Osvežite stranicu ili koristite Chrome.`); setLoading(false); }
@@ -323,6 +407,15 @@ const PDMeasurement = () => {
         audio: false,
       });
       if (!videoRef.current) return;
+      if (debug) {
+        const track = stream.getVideoTracks()[0];
+        const st = track?.getSettings?.() ?? {};
+        // bez deviceId/groupId — identifikatori uređaja ne ulaze u izveštaj
+        cameraInfoRef.current = {
+          label: track?.label ?? '', width: st.width, height: st.height, frameRate: st.frameRate,
+          facingMode: st.facingMode, resizeMode: st.resizeMode,
+        };
+      }
       videoRef.current.srcObject = stream;
       await new Promise(r => { videoRef.current.onloadedmetadata = () => videoRef.current.play().then(r).catch(r); });
       await new Promise(r => setTimeout(r, 300));
@@ -381,11 +474,29 @@ const PDMeasurement = () => {
       setFaceStatus(status);
 
       const hist = faceHistoryRef.current;
-      hist.push({ lX, lY, rX, rY, distanceMm: pose?.distanceMm ?? NaN });
+      hist.push({
+        lX, lY, rX, rY, distanceMm: pose?.distanceMm ?? NaN,
+        yawDeg: pose?.yawDeg ?? NaN, pitchDeg: pose?.pitchDeg ?? NaN,
+        irisL: irisDiameterPx(lm, IRIS_H_EDGES.left, canvas.width, canvas.height),
+        irisR: irisDiameterPx(lm, IRIS_H_EDGES.right, canvas.width, canvas.height),
+      });
       if (hist.length > HISTORY_SIZE) hist.shift();
       const isStill = hist.length >= HISTORY_SIZE
         && stddev(hist.map(h => h.lX)) < STILL_THRESHOLD
         && stddev(hist.map(h => h.rX)) < STILL_THRESHOLD;
+
+      if (debug) {
+        const tick = dbgTickRef.current, now = performance.now();
+        tick.frames++;
+        if (now - tick.since > 250) {
+          setLiveDbg({
+            fps: tick.since ? tick.frames * 1000 / (now - tick.since) : 0,
+            w: canvas.width, h: canvas.height, ipdPx: irisD, ipdPct: irisD / canvas.width * 100,
+            yaw: pose?.yawDeg, pitch: pose?.pitchDeg, dMm: pose?.distanceMm, status,
+          });
+          tick.frames = 0; tick.since = now;
+        }
+      }
 
       if (status === 'good' && isStill) {
         if (!cntdwnStartRef.current) cntdwnStartRef.current = Date.now();
@@ -412,21 +523,35 @@ const PDMeasurement = () => {
           sc.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, snap.width, snap.height);
           sc.restore();
           setSnapshotUrl(snap.toDataURL('image/jpeg', 0.92));
+          if (debug) {
+            const fin = (k) => hist.map(h => h[k]).filter(Number.isFinite);
+            captureMetaRef.current = {
+              videoW: vW, videoH: vH,
+              crop: { x: Math.round(srcX), y: Math.round(srcY), w: Math.round(srcW), h: Math.round(srcH) },
+              frames: hist.length,
+              yawDeg: fin('yawDeg').length ? Number(median(fin('yawDeg')).toFixed(1)) : null,
+              pitchDeg: fin('pitchDeg').length ? Number(median(fin('pitchDeg')).toFixed(1)) : null,
+              pupilJitterPx: Number(Math.max(stddev(hist.map(h => h.lX)), stddev(hist.map(h => h.rX))).toFixed(2)),
+              irisDiameterPx: [median(fin('irisL')), median(fin('irisR'))],
+            };
+          }
           // Kamera se gasi čim je slika uhvaćena (privatnost + baterija)
           video.srcObject?.getTracks().forEach(t => t.stop());
           video.srcObject = null;
           setCameraReady(false);
-          setPupilMarkers([
+          const prefill = [
             { x: ((vW - mLX) - srcX) / srcW * 100, y: (mLY - srcY) / srcH * 100 },
             { x: ((vW - mRX) - srcX) / srcW * 100, y: (mRY - srcY) / srcH * 100 },
-          ]);
+          ];
+          prefillPupilsRef.current = prefill;
+          setPupilMarkers(prefill);
           setCardMarkers([{ x: 12, y: 70 }, { x: 88, y: 70 }]);
           setCountdown(null); setStep('adjust'); return;
         }
       } else { cntdwnStartRef.current = null; setCountdown(null); }
     } catch (e) { console.error('Detection error:', e); }
     ctx.restore(); animationRef.current = requestAnimationFrame(detectFace);
-  }, [faceMesh]);
+  }, [faceMesh, debug]);
 
   useEffect(() => {
     if (cameraReady && faceMesh && step === 'detecting') { lastTimeRef.current = -1; detectFace(); }
@@ -485,7 +610,37 @@ const PDMeasurement = () => {
       rawPdMm: rawPd,
       distanceMm: captureDistanceRef.current,
       cardPosition,
+      includeVergence: !phantom,
     });
+
+    if (debug) {
+      // Prikaz je tačno 3:4 isečak snimka → jedan faktor za px prikaza → px izvora
+      const meta = captureMetaRef.current ?? {};
+      const srcW = meta.crop?.w ?? dw, srcH = meta.crop?.h ?? dh;
+      const toSrc = srcW / dw;
+      const pre = prefillPupilsRef.current;
+      const shift = pre ? Math.max(...pupilMarkers.map((m, i) =>
+        Math.hypot((m.x - pre[i].x) / 100 * srcW, (m.y - pre[i].y) / 100 * srcH))) : NaN;
+      const [min, max] = source === 'vto' ? [48, 80] : [40, 80.5];
+      setReport(buildReport({
+        capture: meta,
+        camera: { ...cameraInfoRef.current, delegate: delegateRef.current },
+        env: {
+          userAgent: navigator.userAgent,
+          screen: `${window.screen.width}x${window.screen.height}`,
+          viewport: `${window.innerWidth}x${window.innerHeight}`,
+          dpr: window.devicePixelRatio, displayPx: `${Math.round(dw)}x${Math.round(dh)}`,
+          source: source ?? null, embed: embed ?? null,
+        },
+        cardSrcPx: cardPx * toSrc,
+        pupilSrcPx: dist(pupilMarkers[0], pupilMarkers[1]) * toSrc,
+        pupilPrefillShiftPx: shift,
+        cardPosition,
+        distanceMm: captureDistanceRef.current,
+        pdFinal: pd >= min && pd <= max ? pd : null,
+        phantom,
+      }));
+    }
 
     const [min, max] = source === 'vto' ? [48, 80] : [40, 80.5];
     if (pd < min || pd > max) {
@@ -541,10 +696,12 @@ const PDMeasurement = () => {
     setCountdown(null); setSnapshotUrl(null); setFinalPD(null); setShowManualCopy(false); setCopyOk(false);
     faceHistoryRef.current = []; cntdwnStartRef.current = null; lastTimeRef.current = -1;
     captureDistanceRef.current = null;
+    captureMetaRef.current = null; prefillPupilsRef.current = null; setReport(null); setLiveDbg(null);
   };
   const retryDetect = () => {
     faceHistoryRef.current = []; cntdwnStartRef.current = null; setCountdown(null); lastTimeRef.current = -1;
     captureDistanceRef.current = null;
+    captureMetaRef.current = null; prefillPupilsRef.current = null; setReport(null); setLiveDbg(null);
     setSnapshotUrl(null); setStep('detecting'); startCamera();
   };
 
@@ -610,6 +767,7 @@ const PDMeasurement = () => {
           <button className="btn-secondary" onClick={retryDetect} style={{ flex: 1 }}>Ponovi</button>
           <button className="btn-primary" onClick={calculatePD} style={{ flex: 2 }}>Izračunaj PD</button>
         </div>
+        {debug && <DebugPanel report={report} phantom={phantom} />}
       </div>
     );
   }
@@ -765,6 +923,7 @@ const PDMeasurement = () => {
             )}
             <video ref={videoRef} playsInline muted />
             <canvas ref={canvasRef} />
+            {debug && <DebugOverlay live={liveDbg} camera={cameraInfoRef.current} delegate={delegateRef.current} phantom={phantom} />}
 
             {/* Status bar — inside camera, bottom */}
             <div style={{
@@ -864,6 +1023,8 @@ const PDMeasurement = () => {
               )}
             </div>
           </div>
+
+          {debug && <DebugPanel report={report} phantom={phantom} />}
 
           <p style={{ marginTop: 60, alignSelf: 'stretch', fontSize: 10, fontWeight: 600, lineHeight: 1.6, letterSpacing: '0.79px', textTransform: 'uppercase', textAlign: 'center', color: '#999' }}>
             Brinemo o vašim očima i vašoj privatnosti

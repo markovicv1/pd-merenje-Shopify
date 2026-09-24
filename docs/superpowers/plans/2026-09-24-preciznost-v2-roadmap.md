@@ -41,6 +41,9 @@ Bez podataka ne znamo stvarni udeo svakog izvora po uređaju.
    yaw/pitch, udaljenost po MediaPipe-u, širina kartice u px izvora, mm/px, pozicija kartice, sirovi PD, faktori korekcija,
    finalni PD, prečnik šarenice u mm (preko skale kartice), koliko je korisnik pomerio markere zenica.
    Izvoz: „Preuzmi JSON" / „Kopiraj JSON". Kada debug nije uključen — nula promena ponašanja.
+   **Status: implementirano** (`src/lib/debugReport.js`, overlay i panel u `PDMeasurement.jsx`).
+   Upotreba: dodati `?debug=1` na adresu kalkulatora (za fantom `?debug=1&fantom=1`); overlay je u uglu kamere,
+   izveštaj se pojavljuje ispod dugmadi posle „Izračunaj PD". Izveštaj ne sadrži sliku ni identifikator kamere.
 2. **Fantom za testiranje** — odštampano lice u prirodnoj veličini, PD izmeren šublerom, kartica na podlošci 10 mm.
    Isti „pacijent" na svim uređajima. `?debug=1&fantom=1` isključuje korekciju konvergencije (odštampane oči ne konvergiraju).
 3. **Matrica uređaja** — 2× iPhone, 3× Android (različiti proizvođači, uključujući jeftin model), 2–3 laptopa (Win/Mac), 1 eksterna kamera.
