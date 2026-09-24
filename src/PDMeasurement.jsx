@@ -1,8 +1,15 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { median, computeCorrectedPd, classifyCardPosition, CARD_WIDTH_MM } from './lib/pdMath.js';
+import { median, computeCorrectedPd, classifyCardPosition } from './lib/pdMath.js';
 import { decomposeFacialMatrix, isPoseFrontal } from './lib/headPose.js';
 import { resolveReturnTarget, ALLOWED_ORIGINS } from './lib/returnTarget.js';
 import { parseDebugFlags, irisDiameterPx, buildReport, IRIS_H_EDGES } from './lib/debugReport.js';
+import { zoomRect, cardPrefill, rawPdFromMarkers, distPx } from './lib/adjustGeometry.js';
+import { distanceStatus, meanLuma, laplacianVariance, eyeForeheadRoi, MIN_LUMA } from './lib/captureGate.js';
+import { createVoice, STATUS_PROMPT, STATUS_HOLD_MS } from './lib/voice.js';
+import { sfx, unlockSfx, vibrate } from './lib/sfx.js';
+import { loadSettings, saveSettings } from './lib/a11ySettings.js';
+import AdjustView from './components/AdjustView.jsx';
+import { AccessibilityPanel, Caption, IcoAccessibility } from './components/A11y.jsx';
 
 // ── Inline SVGs from Figma export ─────────────────────────────────────────
 
@@ -119,8 +126,6 @@ const LEFT_IRIS   = 468;
 const RIGHT_IRIS  = 473;
 const HISTORY_SIZE    = 25;
 const STILL_THRESHOLD = 4;
-const MIN_IRIS_PX     = 65;
-const MAX_IRIS_PX     = 200;
 const COUNTDOWN_MS    = 3000;
 
 function stddev(arr) {
@@ -166,12 +171,7 @@ const GLOBAL_CSS = `
   video { width: 100%; height: 100%; object-fit: cover; display: block; transform: scaleX(-1); }
   canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
 
-  .marker { position: absolute; width: 32px; height: 32px; cursor: grab; transform: translate(-50%, -50%); touch-action: none; user-select: none; }
-  .marker:active { cursor: grabbing; }
-  .marker-h, .marker-v { position: absolute; background: currentColor; }
-  .marker-h { width: 100%; height: 2px; top: 50%; left: 0; transform: translateY(-50%); }
-  .marker-v { width: 2px; height: 100%; left: 50%; top: 0; transform: translateX(-50%); }
-  .marker-dot { position: absolute; width: 8px; height: 8px; border-radius: 50%; border: 2px solid currentColor; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+  button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid #00b8ff; outline-offset: 2px; }
 
   .pd-adjust-hint { position: absolute; top: 22%; left: 50%; transform: translateX(-50%); text-align: center; max-width: 84%; color: #fff; pointer-events: none; opacity: 0.85; text-shadow: 0 2px 8px rgba(0,0,0,0.7), 0 0 16px rgba(0,0,0,0.4); z-index: 6; transition: opacity 0.4s ease-out, visibility 0s linear 0.4s; }
   .pd-adjust-hint.is-hidden { opacity: 0; visibility: hidden; }
@@ -190,7 +190,7 @@ const GLOBAL_CSS = `
 const MAX_W = 420;
 
 // ── Shared header component ───────────────────────────────────────────────
-const Header = ({ eyeVariant }) => (
+const Header = ({ onA11y }) => (
   <div style={{ background: '#121724', flexShrink: 0 }}>
     <header style={{
       display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
@@ -204,14 +204,22 @@ const Header = ({ eyeVariant }) => (
           <span style={{ color: '#8c8c8c', fontSize: 11, fontWeight: 400, marginLeft: -1 }}>Optičarka.com</span>
         </div>
       </div>
-      <button style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-        background: '#00b8ff', color: '#111', fontSize: 12, fontWeight: 600,
-        padding: '8px 16px', borderRadius: 100,
-      }}>
-        <IcoAiBadge />
-        <span>AI Powered</span>
-      </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <button type="button" onClick={onA11y} aria-label="Pristupačnost" title="Pristupačnost" style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36,
+          borderRadius: '50%', color: '#fff', border: '1px solid #404d66',
+        }}>
+          <IcoAccessibility size={22} />
+        </button>
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          background: '#00b8ff', color: '#111', fontSize: 12, fontWeight: 600,
+          padding: '8px 16px', borderRadius: 100,
+        }}>
+          <IcoAiBadge />
+          <span>AI Powered</span>
+        </div>
+      </div>
     </header>
   </div>
 );
@@ -241,6 +249,7 @@ frame ${live ? `${live.w}×${live.h}` : '–'} · ${fmt(live?.fps, 0)} fps
 IPD ${fmt(live?.ipdPx)} px (${fmt(live?.ipdPct)}% š.)
 d(MP) ${fmt(live?.dMm, 0)} mm
 yaw ${fmt(live?.yaw)}° pitch ${fmt(live?.pitch)}°
+svetlo ${fmt(live?.luma, 0)} · oštrina ${fmt(live?.sharp, 0)}
 status ${live?.status ?? '–'}`}
   </div>
 );
@@ -258,12 +267,13 @@ const DebugPanel = ({ report, phantom }) => {
   const json = JSON.stringify(report, null, 2);
   const rows = [
     ['kamera', `${cam.width ?? '?'}×${cam.height ?? '?'} ${cam.delegate ?? ''}`],
-    ['isečak', c.crop ? `${c.crop.w}×${c.crop.h}` : '–'],
+    ['isečak', c.crop ? `${c.crop.w}×${c.crop.h}${report.env?.zoomed ? ' · uvećano' : ''}` : '–'],
     ['kartica', `${fmt(m.cardSrcPx)} px · ${fmt(m.mmPerPx, 3)} mm/px`],
     ['zenice', `${fmt(m.pupilSrcPx)} px · pomereno ${fmt(m.pupilPrefillShiftPx)} px`],
     ['pozicija', m.cardPosition],
     ['d (MP)', `${m.distanceMpMm ?? '–'} mm${m.distanceSanitized ? ` → ${m.distanceUsedMm} (default)` : ''}`],
     ['poza', `yaw ${c.yawDeg ?? '–'}° pitch ${c.pitchDeg ?? '–'}° · jitter ${c.pupilJitterPx ?? '–'} px`],
+    ['svetlo/oštrina', `${c.luma ?? '–'} / ${c.sharpness ?? '–'}`],
     ['PD sirovi', `${fmt(m.rawPdMm, 2)} mm`],
     ['× paralaksa', fmt(m.parallaxFactor, 4)],
     ['× konvergencija', fmt(m.vergenceFactor, 4)],
@@ -301,8 +311,7 @@ const DebugPanel = ({ report, phantom }) => {
 const PDMeasurement = () => {
   const videoRef  = useRef(null);
   const canvasRef = useRef(null);
-  const imgRef    = useRef(null);
-  const adjustRef = useRef(null);
+  const roiCanvasRef = useRef(null); // mali canvas za merenje svetla/oštrine
 
   const [step, setStep]                   = useState('intro');
   const [cameraReady, setCameraReady]     = useState(false);
@@ -321,14 +330,32 @@ const PDMeasurement = () => {
   const [eyeVariant, setEyeVariant]       = useState('open');
   const [showAdjustHint, setShowAdjustHint] = useState(true);
 
-  const [cardMarkers, setCardMarkers]   = useState([{ x: 12, y: 68 }, { x: 88, y: 68 }]);
-  const [pupilMarkers, setPupilMarkers] = useState([{ x: 38, y: 42 }, { x: 62, y: 42 }]);
+  // Markeri u pikselima izvornog snimka (snapSize)
+  const [snapSize, setSnapSize]         = useState({ w: 0, h: 0 });
+  const [cardMarkers, setCardMarkers]   = useState([{ x: 0, y: 0 }, { x: 0, y: 0 }]);
+  const [pupilMarkers, setPupilMarkers] = useState([{ x: 0, y: 0 }, { x: 0, y: 0 }]);
+  const [zoomed, setZoomed]             = useState(true);
+
+  // ── Pristupačnost: podešavanja, titl, glas ──
+  const [settings, setSettingsState] = useState(() => loadSettings());
+  const [a11yOpen, setA11yOpen]      = useState(false);
+  const [caption, setCaption]        = useState(null);
+  const voiceRef = useRef(null);
+  if (!voiceRef.current) {
+    voiceRef.current = createVoice({ baseUrl: `${import.meta.env.BASE_URL}audio/`, onCaption: setCaption });
+  }
+  const voice = voiceRef.current;
+  const setSettings = (next) => { setSettingsState(next); saveSettings(next); };
+  useEffect(() => { voice.setEnabled(settings.voice); }, [settings.voice, voice]);
+  const canVibrate = typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
+  const buzz = (pattern) => { if (settings.vibration) vibrate(pattern); };
+  const play = (name, arg) => { if (settings.sounds) sfx[name](arg); };
 
   const animationRef   = useRef(null);
   const lastTimeRef    = useRef(-1);
   const faceHistoryRef = useRef([]);
   const cntdwnStartRef = useRef(null);
-  const draggingRef    = useRef(null);
+  const lumaRef        = useRef({ luma: NaN, sharp: NaN, n: 0 });
   const captureDistanceRef = useRef(null); // udaljenost kamere (mm) u trenutku snimka
 
   // ── Debug režim (?debug=1, &fantom=1) — bez uticaja na ponašanje kad je isključen
@@ -403,7 +430,8 @@ const PDMeasurement = () => {
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 960 } },
+        // Veća rezolucija (portret 3:4): detekcija radi na umanjenoj slici, snimak u punoj
+        video: { facingMode: 'user', width: { ideal: 1080 }, height: { ideal: 1440 } },
         audio: false,
       });
       if (!videoRef.current) return;
@@ -470,7 +498,23 @@ const PDMeasurement = () => {
       const pose = matrixData ? decomposeFacialMatrix(matrixData) : null;
       const poseOk = !pose || isPoseFrontal(pose);
 
-      const status = irisD < MIN_IRIS_PX ? 'far' : irisD > MAX_IRIS_PX ? 'close' : !poseOk ? 'pose' : 'good';
+      // Svetlo (i oštrina za debug) u oblasti očiju i čela — svakih 10 frejmova, na malom canvasu
+      const lq = lumaRef.current;
+      if (lq.n++ % 10 === 0) {
+        const roi = eyeForeheadRoi({ x: lX, y: lY }, { x: rX, y: rY }, canvas.width, canvas.height);
+        if (roi.w > 4 && roi.h > 4) {
+          const rc = roiCanvasRef.current || (roiCanvasRef.current = document.createElement('canvas'));
+          rc.width = 64; rc.height = 48;
+          const rctx = rc.getContext('2d', { willReadFrequently: true });
+          rctx.drawImage(video, roi.x, roi.y, roi.w, roi.h, 0, 0, 64, 48);
+          const px = rctx.getImageData(0, 0, 64, 48).data;
+          lq.luma = meanLuma(px);
+          if (debug) lq.sharp = laplacianVariance(px, 64, 48);
+        }
+      }
+
+      const dist = distanceStatus(irisD, canvas.width);
+      const status = dist !== 'ok' ? dist : !poseOk ? 'pose' : lq.luma < MIN_LUMA ? 'dark' : 'good';
       setFaceStatus(status);
 
       const hist = faceHistoryRef.current;
@@ -493,6 +537,7 @@ const PDMeasurement = () => {
             fps: tick.since ? tick.frames * 1000 / (now - tick.since) : 0,
             w: canvas.width, h: canvas.height, ipdPx: irisD, ipdPct: irisD / canvas.width * 100,
             yaw: pose?.yawDeg, pitch: pose?.pitchDeg, dMm: pose?.distanceMm, status,
+            luma: lq.luma, sharp: lq.sharp,
           });
           tick.frames = 0; tick.since = now;
         }
@@ -533,19 +578,24 @@ const PDMeasurement = () => {
               pitchDeg: fin('pitchDeg').length ? Number(median(fin('pitchDeg')).toFixed(1)) : null,
               pupilJitterPx: Number(Math.max(stddev(hist.map(h => h.lX)), stddev(hist.map(h => h.rX))).toFixed(2)),
               irisDiameterPx: [median(fin('irisL')), median(fin('irisR'))],
+              luma: Number.isFinite(lq.luma) ? Math.round(lq.luma) : null,
+              sharpness: Number.isFinite(lq.sharp) ? Math.round(lq.sharp) : null,
             };
           }
           // Kamera se gasi čim je slika uhvaćena (privatnost + baterija)
           video.srcObject?.getTracks().forEach(t => t.stop());
           video.srcObject = null;
           setCameraReady(false);
+          // Zenice u px snimka (snimak je ogledalski okrenut); leva na ekranu prva
           const prefill = [
-            { x: ((vW - mLX) - srcX) / srcW * 100, y: (mLY - srcY) / srcH * 100 },
-            { x: ((vW - mRX) - srcX) / srcW * 100, y: (mRY - srcY) / srcH * 100 },
-          ];
+            { x: (vW - mLX) - srcX, y: mLY - srcY },
+            { x: (vW - mRX) - srcX, y: mRY - srcY },
+          ].sort((a, b) => a.x - b.x);
           prefillPupilsRef.current = prefill;
+          setSnapSize({ w: srcW, h: srcH });
           setPupilMarkers(prefill);
-          setCardMarkers([{ x: 12, y: 70 }, { x: 88, y: 70 }]);
+          setCardMarkers(cardPrefill(prefill, srcW, srcH));
+          setZoomed(true);
           setCountdown(null); setStep('adjust'); return;
         }
       } else { cntdwnStartRef.current = null; setCountdown(null); }
@@ -572,39 +622,23 @@ const PDMeasurement = () => {
     return () => clearTimeout(t);
   }, [step]);
 
-  // ── Adjust: dragging ───────────────────────────────────────────────────
-  const getMarkerPct = (e) => {
-    const el = adjustRef.current; if (!el) return null;
-    const rect = el.getBoundingClientRect();
-    const cx = e.touches ? e.touches[0].clientX : e.clientX;
-    const cy = e.touches ? e.touches[0].clientY : e.clientY;
-    return { x: Math.max(0, Math.min(100, (cx - rect.left) / rect.width * 100)), y: Math.max(0, Math.min(100, (cy - rect.top) / rect.height * 100)) };
+  // ── Adjust: pomeranje markera (AdjustView radi u px snimka) ────────────
+  const moveMarker = (group, index, pos) => {
+    const setter = group === 'card' ? setCardMarkers : setPupilMarkers;
+    setter(p => p.map((m, i) => (i === index ? pos : m)));
   };
-  const onMarkerDown = (group, index, e) => { e.stopPropagation(); e.preventDefault(); draggingRef.current = { group, index }; setShowAdjustHint(false); };
-  const onMove = (e) => {
-    if (!draggingRef.current) return; e.preventDefault();
-    const pct = getMarkerPct(e); if (!pct) return;
-    const { group, index } = draggingRef.current;
-    if (group === 'card') setCardMarkers(p => p.map((m, i) => i === index ? { ...m, ...pct } : m));
-    else setPupilMarkers(p => p.map((m, i) => i === index ? { ...m, ...pct } : m));
-  };
-  const onUp = () => { draggingRef.current = null; };
 
   // ── PD calc ────────────────────────────────────────────────────────────
   const formatPd = (v) => v.toLocaleString('sr-RS', { maximumFractionDigits: 1 });
 
   const calculatePD = () => {
-    const el = adjustRef.current; if (!el) return;
-    const dw = el.clientWidth, dh = el.clientHeight;
-    const px = (pct, d) => pct / 100 * d;
-    const dist = (a, b) => Math.sqrt((px(a.x, dw) - px(b.x, dw)) ** 2 + (px(a.y, dh) - px(b.y, dh)) ** 2);
-    const cardPx = dist(cardMarkers[0], cardMarkers[1]);
-    if (cardPx < 10) { setError('Postavite markere kartice dalje jedan od drugog.'); return; }
-
-    const rawPd = dist(pupilMarkers[0], pupilMarkers[1]) * (CARD_WIDTH_MM / cardPx);
+    // Sve u pikselima izvornog snimka — ne zavisi od veličine ekrana ni od zuma prikaza
+    const m = rawPdFromMarkers(cardMarkers, pupilMarkers);
+    if (!m) { setError('Postavite markere kartice dalje jedan od drugog.'); return; }
+    const { cardPx, pupilPx, rawPdMm: rawPd } = m;
     const cardPosition = classifyCardPosition(
-      (cardMarkers[0].y + cardMarkers[1].y) / 2,
-      (pupilMarkers[0].y + pupilMarkers[1].y) / 2,
+      (cardMarkers[0].y + cardMarkers[1].y) / 2 / snapSize.h * 100,
+      (pupilMarkers[0].y + pupilMarkers[1].y) / 2 / snapSize.h * 100,
     );
     const pd = computeCorrectedPd({
       rawPdMm: rawPd,
@@ -612,28 +646,23 @@ const PDMeasurement = () => {
       cardPosition,
       includeVergence: !phantom,
     });
+    const [min, max] = source === 'vto' ? [48, 80] : [40, 80.5];
 
     if (debug) {
-      // Prikaz je tačno 3:4 isečak snimka → jedan faktor za px prikaza → px izvora
-      const meta = captureMetaRef.current ?? {};
-      const srcW = meta.crop?.w ?? dw, srcH = meta.crop?.h ?? dh;
-      const toSrc = srcW / dw;
       const pre = prefillPupilsRef.current;
-      const shift = pre ? Math.max(...pupilMarkers.map((m, i) =>
-        Math.hypot((m.x - pre[i].x) / 100 * srcW, (m.y - pre[i].y) / 100 * srcH))) : NaN;
-      const [min, max] = source === 'vto' ? [48, 80] : [40, 80.5];
+      const shift = pre ? Math.max(...pupilMarkers.map((p, i) => distPx(p, pre[i]))) : NaN;
       setReport(buildReport({
-        capture: meta,
+        capture: captureMetaRef.current ?? {},
         camera: { ...cameraInfoRef.current, delegate: delegateRef.current },
         env: {
           userAgent: navigator.userAgent,
           screen: `${window.screen.width}x${window.screen.height}`,
           viewport: `${window.innerWidth}x${window.innerHeight}`,
-          dpr: window.devicePixelRatio, displayPx: `${Math.round(dw)}x${Math.round(dh)}`,
+          dpr: window.devicePixelRatio, zoomed,
           source: source ?? null, embed: embed ?? null,
         },
-        cardSrcPx: cardPx * toSrc,
-        pupilSrcPx: dist(pupilMarkers[0], pupilMarkers[1]) * toSrc,
+        cardSrcPx: cardPx,
+        pupilSrcPx: pupilPx,
         pupilPrefillShiftPx: shift,
         cardPosition,
         distanceMm: captureDistanceRef.current,
@@ -642,13 +671,14 @@ const PDMeasurement = () => {
       }));
     }
 
-    const [min, max] = source === 'vto' ? [48, 80] : [40, 80.5];
     if (pd < min || pd > max) {
       // Van opsega → korisnik ostaje na adjust koraku i popravlja markere. Bez tihog clamp-a.
       setError(`Vrednost (${formatPd(pd)} mm) je van opsega ${min}–${max} mm. Pomerite markere na ivice kartice i centre zenica, pa pokušajte ponovo.`);
+      voice.say('G22', { interrupt: true }); play('error');
       return;
     }
     setError(null);
+    voice.stop(); play('success'); buzz(60);
     setFinalPD(pd); setStep('result');
   };
 
@@ -690,6 +720,7 @@ const PDMeasurement = () => {
 
   // ── Reset ──────────────────────────────────────────────────────────────
   const reset = () => {
+    voice.stop();
     cancelAnimationFrame(animationRef.current);
     videoRef.current?.srcObject?.getTracks().forEach(t => t.stop());
     setStep('intro'); setCameraReady(false); setFaceDetected(false); setFaceStatus('none');
@@ -702,8 +733,54 @@ const PDMeasurement = () => {
     faceHistoryRef.current = []; cntdwnStartRef.current = null; setCountdown(null); lastTimeRef.current = -1;
     captureDistanceRef.current = null;
     captureMetaRef.current = null; prefillPupilsRef.current = null; setReport(null); setLiveDbg(null);
+    voice.stop();
     setSnapshotUrl(null); setStep('detecting'); startCamera();
   };
+
+  // ── Glasovno vođenje ───────────────────────────────────────────────────
+  // Status detekcije se izgovara tek kad traje STATUS_HOLD_MS (bez „treperenja" poruka)
+  useEffect(() => {
+    if (step !== 'detecting' || !cameraReady || countdown !== null) return;
+    const id = STATUS_PROMPT[faceDetected ? faceStatus : 'none'];
+    if (!id) return;
+    const t = setTimeout(() => voice.say(id), STATUS_HOLD_MS);
+    return () => clearTimeout(t);
+  }, [step, cameraReady, faceDetected, faceStatus, countdown, voice]);
+
+  // Odbrojavanje: glas (G14 „Tri. Dva. Jedan. Snimljeno!") ili pisak; uvek i vibracija
+  const prevCountdownRef = useRef(null);
+  useEffect(() => {
+    const prev = prevCountdownRef.current;
+    prevCountdownRef.current = countdown;
+    if (countdown === prev) return;
+    if (countdown !== null && prev === null) {
+      if (settings.countdown === 'voice' && settings.voice) voice.say('G14', { interrupt: true });
+      else play('tick', countdown <= 1);
+      buzz(40);
+    } else if (countdown !== null) {
+      if (!(settings.countdown === 'voice' && settings.voice)) play('tick', countdown <= 1);
+      buzz(40);
+    } else if (step === 'detecting' && voice.current === 'G14') {
+      voice.stop(); // pokret je prekinuo odbrojavanje
+    }
+  }, [countdown]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Snimak napravljen → okidač (u režimu piska), pa uputstvo za proveru oznaka
+  const prevStepRef = useRef(step);
+  useEffect(() => {
+    const prev = prevStepRef.current;
+    prevStepRef.current = step;
+    if (step === 'adjust' && prev === 'detecting') {
+      if (!(settings.countdown === 'voice' && settings.voice)) play('shutter');
+      buzz([80]);
+      voice.enqueue(['G21']);
+    }
+  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const a11yPanel = (
+    <AccessibilityPanel open={a11yOpen} onClose={() => setA11yOpen(false)}
+      settings={settings} onChange={setSettings} canVibrate={canVibrate} />
+  );
 
   // ══════════════════════════════════════════════════════════════════════
   // ── ADJUST step ───────────────────────────────────────────────────────
@@ -721,45 +798,39 @@ const PDMeasurement = () => {
           </div>
         )}
 
-        <Header eyeVariant={eyeVariant} />
+        <Header onA11y={() => setA11yOpen(true)} />
 
-        {/* Legend — same max-width as content */}
-        <div style={{ maxWidth: MAX_W, width: '100%', alignSelf: 'center', padding: '8px 16px 6px', display: 'flex', alignItems: 'center', gap: 16, fontSize: 12, color: '#8c8c8c', flexShrink: 0 }}>
-          <span><span style={{ color: '#FF6B6B' }}>━</span> ivice kartice</span>
-          <span><span style={{ color: '#00b8ff' }}>━</span> zenice</span>
-          <span style={{ marginLeft: 'auto' }}>Prevucite markere</span>
+        {/* Legenda + uvećano/ceo snimak */}
+        <div style={{ maxWidth: MAX_W, width: '100%', alignSelf: 'center', padding: '8px 16px 6px', display: 'flex', alignItems: 'center', gap: 14, fontSize: 12, color: '#8c8c8c', flexShrink: 0 }}>
+          <span><span style={{ color: '#FF6B6B', fontWeight: 700 }}>[ ]</span> ivice kartice</span>
+          <span><span style={{ color: '#00b8ff' }}>◎</span> zenice</span>
+          <button type="button" onClick={() => setZoomed(z => !z)} style={{ marginLeft: 'auto', color: '#00b8ff', fontSize: 12, fontWeight: 600, padding: '4px 0' }}>
+            {zoomed ? 'Ceo snimak' : 'Uvećaj'}
+          </button>
         </div>
 
-        {/* Photo area — same max-width, height fills remaining space */}
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', overflow: 'hidden', minHeight: 0 }}>
-          <div style={{ width: '100%', maxWidth: MAX_W, flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', background: '#050508', overflow: 'hidden', minHeight: 0 }}>
-            <div
-              ref={adjustRef}
-              onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
-              onTouchMove={onMove} onTouchEnd={onUp}
-              style={{ position: 'relative', touchAction: 'none', aspectRatio: '3/4', height: '100%', maxWidth: '100%' }}
-            >
-              <img ref={imgRef} src={snapshotUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} draggable={false} />
-              <img src={LOGO_URL} alt="" style={{
-                position: 'absolute', top: 10, left: 10, zIndex: 5, pointerEvents: 'none',
-                width: 90, filter: 'invert(1) drop-shadow(0 1px 4px rgba(0,0,0,0.6))',
-              }} />
-              {cardMarkers.map((m, i) => (
-                <div key={`c${i}`} className="marker" onMouseDown={e => onMarkerDown('card', i, e)} onTouchStart={e => onMarkerDown('card', i, e)} style={{ left: `${m.x}%`, top: `${m.y}%`, color: '#FF6B6B' }}>
-                  <div className="marker-h" /><div className="marker-v" /><div className="marker-dot" />
-                </div>
-              ))}
-              {pupilMarkers.map((m, i) => (
-                <div key={`p${i}`} className="marker" onMouseDown={e => onMarkerDown('pupil', i, e)} onTouchStart={e => onMarkerDown('pupil', i, e)} style={{ left: `${m.x}%`, top: `${m.y}%`, color: '#00b8ff' }}>
-                  <div className="marker-h" /><div className="marker-v" /><div className="marker-dot" />
-                </div>
-              ))}
-              <div className={`pd-adjust-hint${showAdjustHint ? '' : ' is-hidden'}`} aria-live="polite">
+        {/* Fotografija — 3:4, širina ograničena i visinom ekrana */}
+        <div style={{ width: '100%', maxWidth: `min(${MAX_W}px, calc((100vh - 340px) * 3 / 4))`, alignSelf: 'center', flexShrink: 0 }}>
+          <AdjustView
+            snapshotUrl={snapshotUrl}
+            snapSize={snapSize}
+            rect={zoomed ? zoomRect(prefillPupilsRef.current, snapSize.w, snapSize.h) : { x: 0, y: 0, w: snapSize.w, h: snapSize.h }}
+            cardMarkers={cardMarkers}
+            pupilMarkers={pupilMarkers}
+            onMove={moveMarker}
+            onInteract={() => setShowAdjustHint(false)}
+            logoUrl={LOGO_URL}
+            hint={
+              <div className={`pd-adjust-hint${showAdjustHint ? '' : ' is-hidden'}`} aria-hidden="true">
                 <div className="pd-adjust-hint__big">Pomaknite crvene markere</div>
                 <div className="pd-adjust-hint__small">na levu i desnu ivicu kartice</div>
               </div>
-            </div>
-          </div>
+            }
+          />
+        </div>
+
+        <div style={{ maxWidth: MAX_W, width: '100%', alignSelf: 'center' }}>
+          <Caption caption={caption} large={settings.largeText} />
         </div>
 
         {/* Buttons — same max-width */}
@@ -768,6 +839,7 @@ const PDMeasurement = () => {
           <button className="btn-primary" onClick={calculatePD} style={{ flex: 2 }}>Izračunaj PD</button>
         </div>
         {debug && <DebugPanel report={report} phantom={phantom} />}
+        {a11yPanel}
       </div>
     );
   }
@@ -787,7 +859,7 @@ const PDMeasurement = () => {
         </div>
       )}
 
-      <Header eyeVariant={eyeVariant} />
+      <Header onA11y={() => setA11yOpen(true)} />
 
       {/* All screen content constrained to MAX_W */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', maxWidth: MAX_W, margin: '0 auto', alignSelf: 'center' }}>
@@ -833,7 +905,7 @@ const PDMeasurement = () => {
                       <IcoCardGraphic />
                     </div>
                   </BlueCell>
-                  <span>Karticu držite ravno na čelu ili vrhu nosa, paralelno sa ekranom</span>
+                  <span>Karticu prislonite ravno na čelo, iznad obrva. Skinite naočare i sočiva u boji.</span>
                 </div>
 
                 {/* Row 2: gledajte u kameru */}
@@ -870,14 +942,19 @@ const PDMeasurement = () => {
               </div>
 
               {/* Start button */}
-              <button className="btn-primary" onClick={() => { startCamera(); setStep('detecting'); }} disabled={!faceMesh}>
+              <button className="btn-primary" onClick={() => {
+                // Klik otključava zvuk (autoplay pravila) — uvodne poruke kreću odmah
+                unlockSfx();
+                voice.stop(); voice.enqueue(['G01', 'G02', 'G03', 'G04']);
+                startCamera(); setStep('detecting');
+              }} disabled={!faceMesh}>
                 {faceMesh ? <><IcoCameraBtn /><span>Započni merenje</span></> : 'Učitavanje...'}
               </button>
             </div>
 
             {/* Footer */}
             <p style={{ width: 256, alignSelf: 'center', color: '#66738c', fontSize: 12, fontWeight: 700, lineHeight: 1.5, textAlign: 'center' }}>
-              <span style={{ fontWeight: 400 }}>Na mobilnom: koristite dva prsta za zoom<br /></span>
+              <span style={{ fontWeight: 400 }}>Oznake možete fino pomerati strelicama; lupa se pojavljuje pri prevlačenju<br /></span>
               Merenje se dešava u vašem browseru, svi podaci ostaju na vašem uređaju
             </p>
           </div>
@@ -903,6 +980,11 @@ const PDMeasurement = () => {
             {faceStatus === 'pose' && (
               <div style={{ display: 'flex', padding: '9px 10px', borderRadius: 8, background: '#664700', color: '#ffd94d', fontWeight: 500 }}>
                 ↻ Ispravite glavu, pogled pravo u kameru
+              </div>
+            )}
+            {faceStatus === 'dark' && (
+              <div style={{ display: 'flex', padding: '9px 10px', borderRadius: 8, background: '#664700', color: '#ffd94d', fontWeight: 500 }}>
+                ☀ Premalo svetla
               </div>
             )}
           </div>
@@ -937,6 +1019,7 @@ const PDMeasurement = () => {
                 : faceStatus === 'far' ? 'Priđite kameri'
                 : faceStatus === 'close' ? 'Odmaknite se malo'
                 : faceStatus === 'pose' ? 'Ispravite glavu, pogled pravo u kameru'
+                : faceStatus === 'dark' ? 'Premalo svetla — okrenite se ka svetlu'
                 : countdown !== null ? 'Ostanite mirni...'
                 : 'Odlično! Ostanite mirni'}
             </div>
@@ -953,6 +1036,8 @@ const PDMeasurement = () => {
               </div>
             )}
           </div>
+
+          <Caption caption={caption} large={settings.largeText} />
 
           {/* Cancel button */}
           <button className="btn-secondary" onClick={reset} style={{ marginTop: 4, marginBottom: 24 }}>
@@ -1033,6 +1118,7 @@ const PDMeasurement = () => {
       )}
 
       </div>{/* end MAX_W wrapper */}
+      {a11yPanel}
     </div>
   );
 };

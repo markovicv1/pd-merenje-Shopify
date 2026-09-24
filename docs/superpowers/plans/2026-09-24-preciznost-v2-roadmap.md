@@ -52,6 +52,21 @@ Bez podataka ne znamo stvarni udeo svakog izvora po uređaju.
 
 ## Faza A — Brza poboljšanja postojećeg toka
 
+> **Status (2026-09-24): implementirano na grani `claude/happy-mendel-t00n04`**, osim tačke 8 (vidi dole).
+> - 1–3, 9: `src/components/AdjustView.jsx` + `src/lib/adjustGeometry.js` — uvećani prikaz (≈2,8 × razmak zenica,
+>   kartica ~2× šira na ekranu), lupa 3×, relativno prevlačenje, dugmad za pomeranje po 1 px snimka, tastatura,
+>   oblici `[ ]` / krug; markeri i proračun u pikselima snimka (ne zavise od ekrana); početni položaj markera kartice
+>   procenjen iz zenica.
+> - 4: kamera traži 1080×1440.
+> - 5: uputstvo samo za čelo. Automatska klasifikacija čelo/nos je ZADRŽANA kao zaštita za korisnike koji ipak stave karticu na nos.
+> - 6: `src/lib/captureGate.js` — prag udaljenosti kao udeo širine kadra (11–20%).
+> - 7: provera svetla (srednja luminansa oblasti očiju i čela < 55 → „Premalo svetla"). Oštrina se za sada samo meri
+>   i beleži u debug izveštaju; prag se uvodi kad se prikupe podaci sa više uređaja.
+> - **8 (tri snimka) prebačeno u Fazu B:** dok se kartica označava ručno, tri snimka znače tri puta označavanje.
+>   Sa automatskom detekcijom kartice (B1) tri snimka ne koštaju korisnika ništa.
+> - Pristupačnost: glasovno vođenje (G01–G08, G11, G13, G14, G21, G22) sa titlom za svaku poruku, efekti u kodu,
+>   vibracija, ikonica i panel pristupačnosti sa podešavanjima (pamte se na uređaju).
+
 1. **Zumirani adjust prikaz** — iseći prikaz na oblast čela i očiju (širina ≈ 1,8× kartica) → kartica ~55% širine umesto ~22% (≈2,5× preciznije).
 2. **Lupa + relativno prevlačenje + fino pomeranje** — marker se pomera za pomeraj prsta (ne skače pod prst), lupa 3× iznad prsta,
    dugmad/strelice za pomeranje po 1 px izvora. Na desktopu markeri fokusabilni i pomerljivi tastaturom (WCAG 2.1.1).
