@@ -50,6 +50,9 @@ export default function AdjustView({
   const [boxW, setBoxW] = useState(0);
   const [drag, setDrag] = useState(null);         // { group, index, px, py } dok traje prevlačenje
   const [selected, setSelected] = useState({ group: 'card', index: 0 });
+  const [nudgeLoupe, setNudgeLoupe] = useState(null); // lupa posle finog pomeranja (miš/tastatura)
+  const nudgeTimer = useRef(null);
+  useEffect(() => () => clearTimeout(nudgeTimer.current), []);
 
   useEffect(() => {
     const el = boxRef.current; if (!el) return;
@@ -92,6 +95,9 @@ export default function AdjustView({
     const m = markers[group][index];
     moveTo(group, index, { x: m.x + dx, y: m.y + dy });
     onInteract?.();
+    setNudgeLoupe({ group, index });
+    clearTimeout(nudgeTimer.current);
+    nudgeTimer.current = setTimeout(() => setNudgeLoupe(null), 1500);
   };
   const onKeyDown = (group, index) => (e) => {
     const step = e.shiftKey ? 5 : 1;
@@ -104,7 +110,12 @@ export default function AdjustView({
 
   // Lupa iznad prsta (ispod ako nema mesta), prikazuje okolinu markera uvećano
   let loupe = null;
-  if (drag && s) {
+  // Lupa pri prevlačenju (iznad prsta/kursora) ili posle finog pomeranja (iznad markera)
+  const lp = drag ?? (nudgeLoupe && s ? { ...nudgeLoupe, ...(() => {
+    const v = toView(markers[nudgeLoupe.group][nudgeLoupe.index]); return { px: v.x, py: v.y };
+  })() } : null);
+  if (lp && s) {
+    const drag = lp;
     const m = markers[drag.group][drag.index];
     const z = s * LOUPE_ZOOM;
     const top = drag.py - LOUPE - 48 < 0 ? drag.py + 48 : drag.py - LOUPE - 48;

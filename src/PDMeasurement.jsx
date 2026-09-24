@@ -254,7 +254,7 @@ status ${live?.status ?? '–'}`}
   </div>
 );
 
-const DebugPanel = ({ report, phantom }) => {
+const DebugPanel = ({ report, phantom, onImage }) => {
   const [msg, setMsg] = useState('');
   if (!report) {
     return (
@@ -298,9 +298,10 @@ const DebugPanel = ({ report, phantom }) => {
           <span style={{ color: '#8c8c8c', minWidth: 110 }}>{k}</span><span>{v}</span>
         </div>
       ))}
-      <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8, alignItems: 'center' }}>
         <button onClick={download} style={{ border: '1px solid #9fe870', borderRadius: 6, padding: '4px 10px' }}>Preuzmi JSON</button>
         <button onClick={copy} style={{ border: '1px solid #9fe870', borderRadius: 6, padding: '4px 10px' }}>Kopiraj JSON</button>
+        {onImage && <button onClick={onImage} style={{ border: '1px solid #9fe870', borderRadius: 6, padding: '4px 10px' }}>Preuzmi snimak</button>}
         <span>{msg}</span>
       </div>
     </div>
@@ -682,6 +683,43 @@ const PDMeasurement = () => {
     setFinalPD(pd); setStep('result');
   };
 
+  // ── Debug: snimak u punoj rezoluciji sa oznakama (preuzima se samo lokalno) ──
+  const downloadAnnotated = () => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      const g = c.getContext('2d');
+      g.drawImage(img, 0, 0);
+      const lw = Math.max(1, c.width / 720);
+      g.lineWidth = lw;
+      g.strokeStyle = '#FF6B6B';
+      cardMarkers.forEach((m, i) => {
+        const h = 40 * lw, d = i === 0 ? 8 * lw : -8 * lw;
+        g.beginPath();
+        g.moveTo(m.x + d, m.y - h); g.lineTo(m.x, m.y - h); g.lineTo(m.x, m.y + h); g.lineTo(m.x + d, m.y + h);
+        g.stroke();
+      });
+      g.strokeStyle = '#00b8ff';
+      pupilMarkers.forEach(m => {
+        g.beginPath(); g.arc(m.x, m.y, 10 * lw, 0, Math.PI * 2); g.stroke();
+        g.beginPath(); g.moveTo(m.x - 3 * lw, m.y); g.lineTo(m.x + 3 * lw, m.y); g.moveTo(m.x, m.y - 3 * lw); g.lineTo(m.x, m.y + 3 * lw); g.stroke();
+      });
+      const r = report?.measurement;
+      g.font = `${14 * lw}px monospace`; g.fillStyle = '#9fe870';
+      g.fillText(`kartica ${r?.cardSrcPx ?? '-'} px | zenice ${r?.pupilSrcPx ?? '-'} px | PD sirovi ${r?.rawPdMm ?? '-'} → ${r?.finalPdMm ?? '-'} mm`, 8 * lw, c.height - 10 * lw);
+      c.toBlob((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `pd-snimak-${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }, 'image/jpeg', 0.95);
+    };
+    img.src = snapshotUrl;
+  };
+
   // ── Return value ───────────────────────────────────────────────────────
   const returnValue = async (pd) => {
     const pdForVto = Math.round(pd); // VTO dropdown radi u celim mm
@@ -838,7 +876,7 @@ const PDMeasurement = () => {
           <button className="btn-secondary" onClick={retryDetect} style={{ flex: 1 }}>Ponovi</button>
           <button className="btn-primary" onClick={calculatePD} style={{ flex: 2 }}>Izračunaj PD</button>
         </div>
-        {debug && <DebugPanel report={report} phantom={phantom} />}
+        {debug && <DebugPanel report={report} phantom={phantom} onImage={snapshotUrl ? downloadAnnotated : null} />}
         {a11yPanel}
       </div>
     );
@@ -1109,7 +1147,7 @@ const PDMeasurement = () => {
             </div>
           </div>
 
-          {debug && <DebugPanel report={report} phantom={phantom} />}
+          {debug && <DebugPanel report={report} phantom={phantom} onImage={snapshotUrl ? downloadAnnotated : null} />}
 
           <p style={{ marginTop: 60, alignSelf: 'stretch', fontSize: 10, fontWeight: 600, lineHeight: 1.6, letterSpacing: '0.79px', textTransform: 'uppercase', textAlign: 'center', color: '#999' }}>
             Brinemo o vašim očima i vašoj privatnosti
