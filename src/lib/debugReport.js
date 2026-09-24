@@ -28,6 +28,8 @@ export function buildReport({
   capture = {}, camera = {}, env = {},
   cardSrcPx, pupilSrcPx, pupilPrefillShiftPx,
   cardPosition, distanceMm, pdFinal, phantom = false,
+  distanceMpMm = distanceMm, distanceCardMm = NaN, distanceSource = 'mediapipe', vfovDeg = NaN,
+  cardDetect = null, cardMarkersMovedPx = null,
 }) {
   const mmPerPx = cardSrcPx > 0 ? CARD_WIDTH_MM / cardSrcPx : NaN;
   const rawPd = pupilSrcPx * mmPerPx;
@@ -53,7 +55,10 @@ export function buildReport({
       pupilSrcPx: r(pupilSrcPx, 1),
       pupilPrefillShiftPx: r(pupilPrefillShiftPx, 1),
       cardPosition,
-      distanceMpMm: r(distanceMm, 0),
+      distanceSource,
+      distanceMpMm: r(distanceMpMm, 0),
+      distanceCardMm: r(distanceCardMm, 0),
+      vfovDeg: r(vfovDeg, 1),
       distanceUsedMm: r(d, 0),
       distanceSanitized: !Number.isFinite(distanceMm) || d !== distanceMm,
       rawPdMm: r(rawPd),
@@ -62,6 +67,15 @@ export function buildReport({
       correctedPdMm: r(rawPd * parallax * vergence),
       finalPdMm: pdFinal ?? null,
       irisDiameterMm: irisMm,
+      cardDetect: cardDetect ? {
+        used: !!cardDetect.used,
+        confidence: r(cardDetect.confidence),
+        widthPx: r(cardDetect.widthPx, 1),
+        heightPx: r(cardDetect.heightPx, 0),
+        tiltDeg: r(cardDetect.tiltDeg, 1),
+        coverage: r(cardDetect.coverage),
+      } : null,
+      cardMarkersMovedPx: r(cardMarkersMovedPx, 1),
     },
   };
 }

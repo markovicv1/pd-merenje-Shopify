@@ -83,6 +83,21 @@ Bez podataka ne znamo stvarni udeo svakog izvora po uređaju.
 
 ## Faza B — Automatizacija (najveći dobitak)
 
+> **Status (2026-09-24): B1 i B4 implementirani** na grani `claude/happy-mendel-t00n04`.
+> - B1 `src/lib/cardDetect.js`: traži se ceo pravougaonik kartice (4 ivice) u ispravljenoj traci iznad očiju;
+>   ivice se doteruju ispod piksela i kroz redove se provlači prava. Na 4 stvarna snimka (EMEET C960, sa
+>   ucrtanim oznakama koje su morale da se maskiraju): 2 tačna na 0,4–0,5% od ručnih oznaka (pouzdanost
+>   0,67–0,79), 2 pogrešna (pouzdanost 0,51–0,56) → prag 0,6; ispod praga markeri ostaju na proceni iz zenica.
+>   Za veći test skup: debug dugme „Snimak bez oznaka".
+> - B4 `src/lib/cardDistance.js`: udaljenost = f·85,6/širina kartice; FOV po klasi uređaja (telefon portret 70°,
+>   telefon landscape 55°, desktop 45°), `?vfov=` za kalibraciju. MediaPipe udaljenost ostaje samo kao rezerva
+>   i u debug izveštaju.
+> - Nalaz validacije (1 osoba, pupilometar 60 mm za daljinu): dva testa sa lenjirom na istom snimku potvrđuju
+>   skalu kartice na 0,2–0,6%, a razmak centara šarenica u ravni lenjira je 62,7–63,5 mm. Razlika u odnosu na
+>   pupilometar (refleks rožnjače) je veća od očekivane razlike metoda (ugao kapa, ~1–2 mm) — proveriti na više
+>   osoba; ako je sistemska, kalibrisati konstantu. Ideja za B2: beli ekran kao izvor svetla i merenje refleksa
+>   na rožnjači, kao pupilometar.
+
 1. **Automatska detekcija ivica kartice** — ROI iz landmarka čela; dve paralelne vertikalne ivice (gradijent + fit prave, subpikselno);
    provera odnosa stranica 85,6 × 53,98 (otkriva nagnutu karticu). Korisnik samo potvrđuje; ručno ostaje kao rezerva.
    (Nije ručno 4-corner markiranje koje je ranije odbijeno — korisnik nema dodatnog posla.)

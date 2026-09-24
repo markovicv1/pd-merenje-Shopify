@@ -4,6 +4,8 @@ import { decomposeFacialMatrix, isPoseFrontal } from './lib/headPose.js';
 import { resolveReturnTarget, ALLOWED_ORIGINS } from './lib/returnTarget.js';
 import { parseDebugFlags, irisDiameterPx, buildReport, IRIS_H_EDGES } from './lib/debugReport.js';
 import { zoomRect, cardPrefill, rawPdFromMarkers, distPx } from './lib/adjustGeometry.js';
+import { detectCardEdges, toGray, CARD_DETECT_MIN_CONFIDENCE } from './lib/cardDetect.js';
+import { distanceFromCard, vfovPrior, parseVfovOverride } from './lib/cardDistance.js';
 import { distanceStatus, meanLuma, laplacianVariance, eyeForeheadRoi, MIN_LUMA } from './lib/captureGate.js';
 import { createVoice, STATUS_PROMPT, STATUS_HOLD_MS } from './lib/voice.js';
 import { sfx, unlockSfx, vibrate } from './lib/sfx.js';
@@ -254,7 +256,7 @@ status ${live?.status ?? '–'}`}
   </div>
 );
 
-const DebugPanel = ({ report, phantom, onImage }) => {
+const DebugPanel = ({ report, phantom, onImage, onImageRaw }) => {
   const [msg, setMsg] = useState('');
   if (!report) {
     return (
@@ -271,7 +273,9 @@ const DebugPanel = ({ report, phantom, onImage }) => {
     ['kartica', `${fmt(m.cardSrcPx)} px · ${fmt(m.mmPerPx, 3)} mm/px`],
     ['zenice', `${fmt(m.pupilSrcPx)} px · pomereno ${fmt(m.pupilPrefillShiftPx)} px`],
     ['pozicija', m.cardPosition],
-    ['d (MP)', `${m.distanceMpMm ?? '–'} mm${m.distanceSanitized ? ` → ${m.distanceUsedMm} (default)` : ''}`],
+    ['udaljenost', `${m.distanceUsedMm ?? '–'} mm (${m.distanceSource}${m.distanceSanitized ? ', default' : ''})`],
+    ['d kartica/MP', `${m.distanceCardMm ?? '–'} / ${m.distanceMpMm ?? '–'} mm · FOV ${m.vfovDeg ?? '–'}°`],
+    ['auto kartica', m.cardDetect ? `${m.cardDetect.used ? 'DA' : 'ne'} · ${m.cardDetect.widthPx ?? '–'} px · pouzd. ${m.cardDetect.confidence ?? '–'}${m.cardMarkersMovedPx != null ? ` · pomereno ${m.cardMarkersMovedPx} px` : ''}` : '–'],
     ['poza', `yaw ${c.yawDeg ?? '–'}° pitch ${c.pitchDeg ?? '–'}° · jitter ${c.pupilJitterPx ?? '–'} px`],
     ['svetlo/oštrina', `${c.luma ?? '–'} / ${c.sharpness ?? '–'}`],
     ['PD sirovi', `${fmt(m.rawPdMm, 2)} mm`],
@@ -302,6 +306,7 @@ const DebugPanel = ({ report, phantom, onImage }) => {
         <button onClick={download} style={{ border: '1px solid #9fe870', borderRadius: 6, padding: '4px 10px' }}>Preuzmi JSON</button>
         <button onClick={copy} style={{ border: '1px solid #9fe870', borderRadius: 6, padding: '4px 10px' }}>Kopiraj JSON</button>
         {onImage && <button onClick={onImage} style={{ border: '1px solid #9fe870', borderRadius: 6, padding: '4px 10px' }}>Preuzmi snimak</button>}
+        {onImageRaw && <button onClick={onImageRaw} style={{ border: '1px solid #9fe870', borderRadius: 6, padding: '4px 10px' }}>Snimak bez oznaka</button>}
         <span>{msg}</span>
       </div>
     </div>
@@ -357,7 +362,10 @@ const PDMeasurement = () => {
   const faceHistoryRef = useRef([]);
   const cntdwnStartRef = useRef(null);
   const lumaRef        = useRef({ luma: NaN, sharp: NaN, n: 0 });
-  const captureDistanceRef = useRef(null); // udaljenost kamere (mm) u trenutku snimka
+  const captureDistanceRef = useRef(null); // udaljenost po MediaPipe-u (mm) — samo rezerva i debug
+  const captureFrameRef    = useRef(null); // { vW, vH } frejma kamere pri snimku (za FOV → udaljenost iz kartice)
+  const cardDetectRef      = useRef(null); // rezultat automatske detekcije kartice (B1)
+  const [cardAuto, setCardAuto] = useState(false);
 
   // ── Debug režim (?debug=1, &fantom=1) — bez uticaja na ponašanje kad je isključen
   const { debug, phantom } = useRef(parseDebugFlags(window.location.search)).current;
@@ -595,7 +603,17 @@ const PDMeasurement = () => {
           prefillPupilsRef.current = prefill;
           setSnapSize({ w: srcW, h: srcH });
           setPupilMarkers(prefill);
-          setCardMarkers(cardPrefill(prefill, srcW, srcH));
+          captureFrameRef.current = { vW, vH };
+          // B1: automatska detekcija ivica kartice na punoj rezoluciji; ispod praga pouzdanosti → procena iz zenica
+          let det = null;
+          try {
+            const img = sc.getImageData(0, 0, snap.width, snap.height);
+            det = detectCardEdges({ gray: toGray(img.data, snap.width, snap.height), width: snap.width, height: snap.height, pupils: prefill });
+          } catch (e) { console.warn('Detekcija kartice:', e); }
+          const autoOk = !!det && det.confidence >= CARD_DETECT_MIN_CONFIDENCE;
+          cardDetectRef.current = det ? { ...det, used: autoOk } : { used: false };
+          setCardAuto(autoOk);
+          setCardMarkers(autoOk ? det.markers : cardPrefill(prefill, srcW, srcH));
           setZoomed(true);
           setCountdown(null); setStep('adjust'); return;
         }
@@ -641,9 +659,17 @@ const PDMeasurement = () => {
       (cardMarkers[0].y + cardMarkers[1].y) / 2 / snapSize.h * 100,
       (pupilMarkers[0].y + pupilMarkers[1].y) / 2 / snapSize.h * 100,
     );
+    // B4: udaljenost iz poznate širine kartice (FOV po klasi uređaja); MediaPipe samo kao rezerva
+    const frame = captureFrameRef.current;
+    const mobile = navigator.userAgentData?.mobile ?? /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+    const vfovDeg = parseVfovOverride(window.location.search)
+      ?? (frame ? vfovPrior({ mobile, frameW: frame.vW, frameH: frame.vH }) : NaN);
+    const distanceCardMm = frame ? distanceFromCard({ cardPx, frameH: frame.vH, vfovDeg, cardPosition }) : NaN;
+    const useCard = Number.isFinite(distanceCardMm);
+    const distanceMm = useCard ? distanceCardMm : captureDistanceRef.current;
     const pd = computeCorrectedPd({
       rawPdMm: rawPd,
-      distanceMm: captureDistanceRef.current,
+      distanceMm,
       cardPosition,
       includeVergence: !phantom,
     });
@@ -666,7 +692,14 @@ const PDMeasurement = () => {
         pupilSrcPx: pupilPx,
         pupilPrefillShiftPx: shift,
         cardPosition,
-        distanceMm: captureDistanceRef.current,
+        distanceMm,
+        distanceMpMm: captureDistanceRef.current,
+        distanceCardMm,
+        distanceSource: useCard ? 'kartica' : 'mediapipe',
+        vfovDeg,
+        cardDetect: cardDetectRef.current,
+        cardMarkersMovedPx: cardDetectRef.current?.used
+          ? Math.max(...cardMarkers.map((m, i) => distPx(m, cardDetectRef.current.markers[i]))) : null,
         pdFinal: pd >= min && pd <= max ? pd : null,
         phantom,
       }));
@@ -684,13 +717,14 @@ const PDMeasurement = () => {
   };
 
   // ── Debug: snimak u punoj rezoluciji sa oznakama (preuzima se samo lokalno) ──
-  const downloadAnnotated = () => {
+  const downloadAnnotated = (annotate = true) => {
     const img = new Image();
     img.onload = () => {
       const c = document.createElement('canvas');
       c.width = img.naturalWidth; c.height = img.naturalHeight;
       const g = c.getContext('2d');
       g.drawImage(img, 0, 0);
+      if (!annotate) return save(c, 'pd-snimak-cist');
       const lw = Math.max(1, c.width / 720);
       g.lineWidth = lw;
       g.strokeStyle = '#FF6B6B';
@@ -708,15 +742,16 @@ const PDMeasurement = () => {
       const r = report?.measurement;
       g.font = `${14 * lw}px monospace`; g.fillStyle = '#9fe870';
       g.fillText(`kartica ${r?.cardSrcPx ?? '-'} px | zenice ${r?.pupilSrcPx ?? '-'} px | PD sirovi ${r?.rawPdMm ?? '-'} → ${r?.finalPdMm ?? '-'} mm`, 8 * lw, c.height - 10 * lw);
-      c.toBlob((blob) => {
-        if (!blob) return;
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = `pd-snimak-${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
-        document.body.appendChild(a); a.click(); a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-      }, 'image/jpeg', 0.95);
+      save(c, 'pd-snimak');
     };
+    const save = (c, name) => c.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `${name}-${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }, 'image/jpeg', 0.95);
     img.src = snapshotUrl;
   };
 
@@ -764,12 +799,12 @@ const PDMeasurement = () => {
     setStep('intro'); setCameraReady(false); setFaceDetected(false); setFaceStatus('none');
     setCountdown(null); setSnapshotUrl(null); setFinalPD(null); setShowManualCopy(false); setCopyOk(false);
     faceHistoryRef.current = []; cntdwnStartRef.current = null; lastTimeRef.current = -1;
-    captureDistanceRef.current = null;
+    captureDistanceRef.current = null; captureFrameRef.current = null; cardDetectRef.current = null; setCardAuto(false);
     captureMetaRef.current = null; prefillPupilsRef.current = null; setReport(null); setLiveDbg(null);
   };
   const retryDetect = () => {
     faceHistoryRef.current = []; cntdwnStartRef.current = null; setCountdown(null); lastTimeRef.current = -1;
-    captureDistanceRef.current = null;
+    captureDistanceRef.current = null; captureFrameRef.current = null; cardDetectRef.current = null; setCardAuto(false);
     captureMetaRef.current = null; prefillPupilsRef.current = null; setReport(null); setLiveDbg(null);
     voice.stop();
     setSnapshotUrl(null); setStep('detecting'); startCamera();
@@ -860,8 +895,8 @@ const PDMeasurement = () => {
             logoUrl={LOGO_URL}
             hint={
               <div className={`pd-adjust-hint${showAdjustHint ? '' : ' is-hidden'}`} aria-hidden="true">
-                <div className="pd-adjust-hint__big">Pomaknite crvene markere</div>
-                <div className="pd-adjust-hint__small">na levu i desnu ivicu kartice</div>
+                <div className="pd-adjust-hint__big">{cardAuto ? 'Proverite crvene oznake' : 'Pomaknite crvene markere'}</div>
+                <div className="pd-adjust-hint__small">{cardAuto ? 'kartica je prepoznata automatski' : 'na levu i desnu ivicu kartice'}</div>
               </div>
             }
           />
@@ -876,7 +911,7 @@ const PDMeasurement = () => {
           <button className="btn-secondary" onClick={retryDetect} style={{ flex: 1 }}>Ponovi</button>
           <button className="btn-primary" onClick={calculatePD} style={{ flex: 2 }}>Izračunaj PD</button>
         </div>
-        {debug && <DebugPanel report={report} phantom={phantom} onImage={snapshotUrl ? downloadAnnotated : null} />}
+        {debug && <DebugPanel report={report} phantom={phantom} onImage={snapshotUrl ? () => downloadAnnotated(true) : null} onImageRaw={snapshotUrl ? () => downloadAnnotated(false) : null} />}
         {a11yPanel}
       </div>
     );
@@ -1147,7 +1182,7 @@ const PDMeasurement = () => {
             </div>
           </div>
 
-          {debug && <DebugPanel report={report} phantom={phantom} onImage={snapshotUrl ? downloadAnnotated : null} />}
+          {debug && <DebugPanel report={report} phantom={phantom} onImage={snapshotUrl ? () => downloadAnnotated(true) : null} onImageRaw={snapshotUrl ? () => downloadAnnotated(false) : null} />}
 
           <p style={{ marginTop: 60, alignSelf: 'stretch', fontSize: 10, fontWeight: 600, lineHeight: 1.6, letterSpacing: '0.79px', textTransform: 'uppercase', textAlign: 'center', color: '#999' }}>
             Brinemo o vašim očima i vašoj privatnosti
