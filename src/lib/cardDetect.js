@@ -47,7 +47,10 @@ function fitLine(pts) {
   const tol = Math.max(1, 2.5 * median(res));
   const keep = pts.filter((_, i) => res[i] <= tol);
   if (keep.length >= 3) l = fit(keep);
-  return { ...l, n: keep.length };
+  // Pravost: RMS odstupanja i udeo tačaka na pravoj (ivica kartice je prava, ivica prsta nije)
+  const r2 = keep.map(([t, s]) => (s - (l.a + l.b * t)) ** 2);
+  const rms = Math.sqrt(r2.reduce((x, y) => x + y, 0) / Math.max(1, r2.length));
+  return { ...l, n: keep.length, rms, inlier: keep.length / pts.length };
 }
 
 export function detectCardEdges({ gray, width, height, pupils, mask = null }) {
@@ -159,8 +162,14 @@ export function detectCardEdges({ gray, width, height, pupils, mask = null }) {
         const r1 = r0 + d; if (r1 >= H - 2) break;
         const bot = hMean(r1, c0, c1); if (bot < 0.15) continue;
         const left = vMean(a, r0 + 2, r1 - 2), right = vMean(b, r0 + 2, r1 - 2);
+        // Ugao: gornja i donja ivica moraju da se ZAVRŠE kod a i b (ivica prsta unutar kartice
+        // to ne ispunjava — ivica kartice se nastavlja dalje)
+        const ext = Math.max(
+          c0 - 24 >= 0 ? hMean(r0, Math.max(0, a - 24), a - 5) : 0, c1 + 24 < W ? hMean(r0, b + 5, Math.min(W - 1, b + 24)) : 0,
+          c0 - 24 >= 0 ? hMean(r1, Math.max(0, a - 24), a - 5) : 0, c1 + 24 < W ? hMean(r1, b + 5, Math.min(W - 1, b + 24)) : 0);
         // Obe uspravne ivice moraju postojati; zbir sa težinom po dužini ivice
-        const score = (Math.min(left, right) * 2 * d + (top_ + bot) * w) / (2 * d + 2 * w) + 0.5 * Math.min(left, right);
+        const score = (Math.min(left, right) * 2 * d + (top_ + bot) * w) / (2 * d + 2 * w) + 0.5 * Math.min(left, right)
+          - 0.6 * Math.max(0, ext - 0.1);
         if (!pairBest || score > pairBest.score) pairBest = { score, r0, r1 };
       }
     }
@@ -206,10 +215,12 @@ export function detectCardEdges({ gray, width, height, pupils, mask = null }) {
 
   const heightPx = best.hz.r1 - best.hz.r0;
   const coverage = Math.min(la.n, lb.n) / Math.max(1, r1 - r0 + 1);
-  const confidence = Math.max(0, Math.min(1,
-    0.5 * Math.min(1, coverage / 0.5)
-    + 0.3 * (second > 0 ? Math.min(1, (best.score / second - 1) / 0.5) : 1)
-    + 0.2 * Math.max(0, 1 - Math.abs(heightPx / widthPx / CARD_ASPECT - 0.9) / 0.2)));
+  // Pouzdanost: pre svega pravost obe ivice (ivica kartice je prava, ivica prsta/kose nije),
+  // zatim koliki deo visine kartice ivice pokrivaju. Kalibrisano na 6 stvarnih snimaka:
+  // tačne detekcije max RMS 0,30–1,29 px, pogrešne 1,64–1,90 px.
+  const maxRms = Math.max(la.rms, lb.rms);
+  const straight = Math.max(0, Math.min(1, (1.6 - maxRms) / 1.1));
+  const confidence = 0.6 * straight + 0.4 * Math.min(1, coverage / 0.5);
 
   return {
     markers: [L, R],
@@ -218,9 +229,11 @@ export function detectCardEdges({ gray, width, height, pupils, mask = null }) {
     tiltDeg: Math.atan(slope) * 180 / Math.PI,
     coverage,
     confidence,
+    rms: [la.rms, lb.rms],
+    inlier: [la.inlier, lb.inlier],
   };
 }
 
 // Ispod praga se ne koristi automatski rezultat (markeri ostaju na proceni iz zenica).
-// Kalibrisano na 4 stvarna snimka: tačne detekcije 0,67–0,79, pogrešne 0,51–0,56.
-export const CARD_DETECT_MIN_CONFIDENCE = 0.6;
+// Na 6 stvarnih snimaka: tačne detekcije (≤0,8% od ručnih oznaka) 0,57–1,00, pogrešne 0,30–0,40.
+export const CARD_DETECT_MIN_CONFIDENCE = 0.5;
