@@ -45,14 +45,14 @@ Puštaju se kada stanje traje ≥ 1 s; ista poruka se ne ponavlja pre 4 s. Prior
 
 ## 3. Odbrojavanje i snimanje
 
-Odbrojavanje se ne prekida drugim porukama. Korisnik bira glas ili pisak (Z01); broj je uvek i na ekranu.
+Odbrojavanje se ne prekida drugim porukama. Korisnik bira glas ili pisak (Z01 + Z02); broj je uvek i na ekranu.
+**Snimljeno kao jedan fajl** (G14–G17 spojeni): `G14_odbrojavanje_snimljeno` — „Tri. Dva. Jedan. Snimljeno!".
+Titl prati reči po vremenu u snimku. Početak reči u snimku (izmereno): ~0,2 s, ~1,9 s, ~3,2 s — pri povezivanju
+uskladiti odbrojavanje na ekranu sa snimkom (ili snimiti ponovo u ritmu tačno 1 s po reči).
 
 | ID | Fajl | Kada se pušta | Tekst (glas = titl) |
 |---|---|---|---|
-| G14 | `G14_tri` | odbrojavanje | Tri |
-| G15 | `G15_dva` | odbrojavanje | Dva |
-| G16 | `G16_jedan` | odbrojavanje | Jedan |
-| G17 | `G17_snimljeno` | snimak napravljen | Snimljeno. |
+| G14 | `G14_odbrojavanje_snimljeno` | odbrojavanje + snimak | Tri. Dva. Jedan. Snimljeno! |
 | G18 | `G18_jos_jednom` | pre 2. snimka | Još jedan snimak. Ostanite u istom položaju. |
 | G19 | `G19_poslednji` | pre 3. snimka | Poslednji snimak. |
 | G20 | `G20_snimci_se_razlikuju` | snimci se razlikuju > 1 mm | Snimci se razlikuju. Ponovićemo merenje. |
@@ -100,18 +100,29 @@ titl za oboje. Ostale poruke (G05–G28) se koriste i u ovom režimu.
 
 ## 7. Zvučni efekti (bez govora)
 
-Mogu se generisati u kodu (Web Audio) — snimanje nije obavezno. Ako se snimaju: iste tehničke specifikacije.
+**Odluka: generišu se u kodu (Web Audio), bez fajlova** — nula preuzimanja, isti zvuk na svim uređajima.
+Koriste se kada korisnik izabere pisak umesto glasa, i za uspeh/grešku.
 
 | ID | Fajl | Kada | Opis |
 |---|---|---|---|
-| Z01 | `Z01_tik` | svaka sekunda odbrojavanja | kratak pisak ~880 Hz, 120 ms |
-| Z02 | `Z02_okidac` | snimak | zvuk okidača ~200 ms |
-| Z03 | `Z03_uspeh` | rezultat | prijatan akord ~600 ms |
-| Z04 | `Z04_greska` | greška / van opsega | dva tiha niža tona ~400 ms |
+| Z01 | (kod) | svaka sekunda odbrojavanja | sinus 1000 Hz, 90 ms, napad 5 ms, eksponencijalno gašenje; poslednji tik 1500 Hz |
+| Z02 | (kod) | snimak | okidač: kratak šum (band-pass ~2 kHz) 40 ms + drugi klik 40 ms posle 70 ms |
+| Z03 | (kod) | rezultat | dva rastuća tona 660 → 990 Hz, po 120 ms, blago gašenje ~300 ms |
+| Z04 | (kod) | greška / van opsega | dva tiha opadajuća tona 440 → 330 Hz, po 150 ms, niža jačina |
 
 ## Ukupno za snimanje
 
-- Glasovne poruke: G01–G28 (28) + P01–P05 (5) = **33**
+- Glasovne poruke: G01–G28 bez G15–G17 (25) + P01–P05 (5) = **30**
 - Brojevi: N40–N80 (41) + N_IPO (1) = **42**
-- Zvučni efekti: Z01–Z04 (4, opciono — mogu u kodu)
-- **Ukupno: 75 glasovnih snimaka** (+ 4 efekta)
+- Zvučni efekti: Z01–Z04 — u kodu, ne snimaju se
+- **Ukupno: 72 glasovna snimka**
+
+## Status snimaka (2026-09-24)
+
+Primljeno i obrađeno u `public/audio/` (AAC `.m4a`, mono, 48 kHz, 96 kbps; tišina skraćena na 0,05 s na početku
+i 0,25 s na kraju; glasnoća govora izjednačena na −19 dBFS RMS, vrh ≤ −1 dBFS):
+G01–G08, G10–G14, G18–G23 (19 fajlova).
+
+**Nedostaje:** G09 („Ne vidim karticu. Prislonite je ravno na čelo.") — potreban tek za Fazu B.
+**Sledeće serije:** G24–G28, P01–P05, N40–N80, N_IPO.
+Originali ostaju kod Marka (master); u repozitorijumu su samo obrađene verzije.
