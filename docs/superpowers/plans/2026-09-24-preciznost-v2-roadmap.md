@@ -230,3 +230,17 @@ Stari Android (Android 10, „camera 0, facing back", 1440×1080), testerka rani
 - Sirovi PD je VEĆI izbliza (prednja, ~31 cm) nego izdaleka (zadnja, ~62 cm), a model (paralaksa + vergencija)
   predviđa suprotno. Razlika ≈ 5 %. Moguće: kartica odmaknuta od čela (kosa, prsti) u snimcima zadnjom kamerom,
   razlika kamera, ili šum (±1,5 = ~1,4 SD). Test: ista osoba, zadnja kamera na ~40 cm i ~60 cm.
+
+Dopuna (isti tablet i osoba, zadnja kamera, udaljenost metrom):
+
+| Udaljenost | Kartica px | Zenice px | Sirovi | Rezultat (app) | Sa tačnom udalj. |
+|---|---|---|---|---|---|
+| 40 cm | 477,4 | 328,6 | 58,92 | 62,0 | 61,4 |
+| 60 cm | 323,3 | 231,4 | 61,29 | 63,5 | 63,0 |
+
+- Dva snimka na 60 cm daju sirovi 59,48 i 61,29 (3 % razlike) → rasipanje pojedinačnog snimka (držanje kartice,
+  položaj oznaka) je veće od razlike između kamera/udaljenosti. Nema dokaza sistemske greške zadnje kamere.
+- Zadnja kamera, 4 snimka sa tačnom udaljenošću: 61,4 / 61,1 / 61,4 / 63,0 → prosek 61,7 (−1,3 u odnosu na ~63).
+  Prednja: 64,5 (+1,5). Jedna osoba, referenca približna — konstante se ne menjaju.
+- FOV tableta iz sva 4 merenja: 28,5° → prior zadnje kamere 29° (portret 38°).
+- Predlog: dva snimka zaredom i prosek (smanjuje rasipanje ~1,4×).
