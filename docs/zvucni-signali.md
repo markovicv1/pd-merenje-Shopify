@@ -101,6 +101,41 @@ titl za oboje. Ostale poruke (G05–G28) se koriste i u ovom režimu.
 | P06 | `P06_jos_jedan_snimak` | posle 1. snimka (zadnja kamera) | Još jedan snimak. Spustite karticu i ponovo je prislonite na čelo. **(novo — zasad samo titl)** |
 | P07 | `P07_snimci_se_razlikuju` | dva snimka se razlikuju > 2 mm | Snimci se razlikuju. Još jedan snimak. **(novo — zasad samo titl)** |
 
+## 6a. Oblik lica (`?app=oblik`)
+
+Poseban interfejs, bez uvoda. Titlovi već postoje u aplikaciji (`src/FaceShape.jsx`); glas se dodaje kad se snimi.
+Rezultat se sklapa iz delova: O10 + naziv oblika, a za dvojni rezultat O10 + oblik + O11 + oblik
+(npr. „Vaš oblik lica je ovalno, sa elementima dijamantskog."). Procenti se samo ispisuju, ne izgovaraju.
+
+| ID | Fajl | Kada se pušta | Tekst (glas = titl) |
+|---|---|---|---|
+| O01 | `O01_kosa_naocare` | pokretanje kamere | Sklonite kosu sa čela i skinite naočare. |
+| O02 | `O02_lice_u_okvir` | lice nije detektovano | Postavite lice u okvir. |
+| O03 | `O03_gledajte_pravo` | glava nije frontalno | Gledajte pravo u kameru. |
+| O04 | `O04_pridjite` | predaleko | Priđite bliže. |
+| O05 | `O05_odmaknite` | preblizu | Odmaknite se malo. |
+| O06 | `O06_celo_lice` | deo lica van kadra | Celo lice treba da bude u kadru. |
+| O07 | `O07_mirujte` | prikupljanje (1,5 s) | Mirujte. |
+| O08 | `O08_nije_uspelo` | posle 20 s bez rezultata | Nismo uspeli da prepoznamo oblik lica. Gledajte pravo u kameru, uz dobro svetlo. |
+| O10 | `O10_vas_oblik_je` | rezultat (početak rečenice) | Vaš oblik lica je |
+| O11 | `O11_sa_elementima` | dvojni rezultat, između oblika | sa elementima |
+| O20 | `O20_ovalno` | naziv oblika | ovalno |
+| O21 | `O21_okruglo` | naziv oblika | okruglo |
+| O22 | `O22_duguljasto` | naziv oblika | duguljasto |
+| O23 | `O23_cetvrtasto` | naziv oblika | četvrtasto |
+| O24 | `O24_srcoliko` | naziv oblika | srcoliko |
+| O25 | `O25_trouglasto` | naziv oblika | trouglasto |
+| O26 | `O26_dijamantsko` | naziv oblika | dijamantsko |
+| O30 | `O30_ovalnog` | drugi oblik (genitiv) | ovalnog |
+| O31 | `O31_okruglog` | drugi oblik | okruglog |
+| O32 | `O32_duguljastog` | drugi oblik | duguljastog |
+| O33 | `O33_cetvrtastog` | drugi oblik | četvrtastog |
+| O34 | `O34_srcolikog` | drugi oblik | srcolikog |
+| O35 | `O35_trouglastog` | drugi oblik | trouglastog |
+| O36 | `O36_dijamantskog` | drugi oblik | dijamantskog |
+
+Napomena: O04/O05 imaju isti tekst kao G06/G07 — mogu se preuzeti isti snimci.
+
 ## 7. Zvučni efekti (bez govora)
 
 **Odluka: generišu se u kodu (Web Audio), bez fajlova** — nula preuzimanja, isti zvuk na svim uređajima.
@@ -115,10 +150,11 @@ Koriste se kada korisnik izabere pisak umesto glasa, i za uspeh/grešku.
 
 ## Ukupno za snimanje
 
-- Glasovne poruke: G01–G28 bez G15–G17 (25) + P01–P05 (5) = **30**
+- Glasovne poruke: G01–G28 bez G15–G17 (25) + P01–P07 (7) + G03A (1) = **33**
+- Oblik lica: O01–O08 (8) + O10–O11 (2) + O20–O26 (7) + O30–O36 (7) = **24** (O04/O05 mogu biti G06/G07)
 - Brojevi: N40–N80 (41) + N_IPO (1) = **42**
 - Zvučni efekti: Z01–Z04 — u kodu, ne snimaju se
-- **Ukupno: 72 glasovna snimka**
+- **Ukupno: 99 glasovnih snimaka**
 
 ## Status snimaka (2026-09-24)
 
