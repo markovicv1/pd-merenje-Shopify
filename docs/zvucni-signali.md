@@ -92,7 +92,7 @@ titl za oboje. Ostale poruke (G05–G28) se koriste i u ovom režimu.
 
 | ID | Fajl | Kada se pušta | Tekst (glas = titl) |
 |---|---|---|---|
-| P01 | `P01_pomocnik_uvod` | početak režima | Režim uz pomoć druge osobe. Osoba koja meri drži telefon oko jedan metar od vašeg lica. |
+| P01 | `P01_pomocnik_uvod` | početak režima | Režim uz pomoć druge osobe. Osoba koja meri drži telefon oko pola metra od vašeg lica, zadnjom kamerom prema vama. **(u upotrebi od 2026-09-25 — zasad samo titl)** |
 | P02 | `P02_gledajte_objektiv` | posle P01 i pri skretanju pogleda | Gledajte pravo u kameru na poleđini telefona. |
 | P03 | `P03_priblizite` | predaleko | Približite telefon. |
 | P04 | `P04_udaljite` | preblizu | Udaljite telefon. |
@@ -125,5 +125,6 @@ G01–G08, G10–G14, G18–G23 (19 fajlova).
 
 **Nedostaje:** G09 („Ne vidim karticu. Prislonite je na čelo, iznad obrva.") — potreban za proveru kartice uživo.
 **Snimiti ponovo:** G10 — tekst usklađen sa standardnim uputstvom „kartica na čelu, iznad obrva" (2026-09-25).
-**Sledeće serije:** G24–G28, P01–P05, N40–N80, N_IPO.
+**Prioritet za asistirani režim (zadnja kamera):** P01, P02 — već se prikazuju kao titl.
+**Sledeće serije:** G24–G28, P03–P05, N40–N80, N_IPO.
 Originali ostaju kod Marka (master); u repozitorijumu su samo obrađene verzije.

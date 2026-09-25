@@ -7,9 +7,11 @@ import { CARD_WIDTH_MM, CARD_DEPTH_OFFSET_MM } from './pdMath.js';
 // Telefon u portretu: vertikala je duža strana senzora prednje kamere (~23–26 mm ekv.).
 // Desktop/laptop: vertikala je kraća strana senzora (i kad Chrome iseče portret, visina ostaje cela).
 // Kalibracija: EMEET C960 2K ≈ 44–45° (merenja 2026-09-24).
-export const VFOV_PRIOR = { phonePortrait: 70, phoneLandscape: 55, desktop: 45 };
+// Zadnja (glavna) kamera telefona: ~26 mm ekv. → uža od prednje. Nije kalibrisano na testerima (asistirani režim).
+export const VFOV_PRIOR = { phonePortrait: 70, phoneLandscape: 55, desktop: 45, rearPortrait: 64, rearLandscape: 50 };
 
-export function vfovPrior({ mobile, frameW, frameH }) {
+export function vfovPrior({ mobile, frameW, frameH, rear = false }) {
+  if (mobile && rear) return frameH >= frameW ? VFOV_PRIOR.rearPortrait : VFOV_PRIOR.rearLandscape;
   if (mobile) return frameH >= frameW ? VFOV_PRIOR.phonePortrait : VFOV_PRIOR.phoneLandscape;
   return VFOV_PRIOR.desktop;
 }

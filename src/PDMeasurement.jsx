@@ -6,7 +6,7 @@ import { parseDebugFlags, irisDiameterPx, buildReport, IRIS_H_EDGES } from './li
 import { zoomRect, cardPrefill, rawPdFromMarkers, distPx } from './lib/adjustGeometry.js';
 import { detectCardEdges, toGray, CARD_DETECT_MIN_CONFIDENCE } from './lib/cardDetect.js';
 import { distanceFromCard, vfovPrior, parseVfovOverride } from './lib/cardDistance.js';
-import { estimateFaceDistance, distanceStatusMm, evaluateCard, aggregateBurst, DIST_BLOCK_MAX_MS } from './lib/cardCheck.js';
+import { estimateFaceDistance, distanceStatusMm, evaluateCard, aggregateBurst, DIST_BLOCK_MAX_MS, DIST_MAX_MM, DIST_MAX_ASSISTED_MM } from './lib/cardCheck.js';
 import { meanLuma, laplacianVariance, eyeForeheadRoi, MIN_LUMA } from './lib/captureGate.js';
 import { createVoice, STATUS_PROMPT, STATUS_HOLD_MS } from './lib/voice.js';
 import { sfx, unlockSfx, vibrate } from './lib/sfx.js';
@@ -128,15 +128,15 @@ const IcoResultHeader = () => (
 const LEFT_IRIS   = 468;
 const RIGHT_IRIS  = 473;
 const HISTORY_SIZE    = 25;
-const STILL_THRESHOLD = 4;
+const STILL_FRAC      = 0.03;  // mirovanje: SD položaja zenica < 3% razmaka zenica (ne zavisi od rezolucije)
 const COUNTDOWN_MS    = 3000;
 const BURST_FRAMES    = 3;     // rafal pri snimku: kartica se detektuje na svakom, uzima se medijana
 const CARD_CHECK_MS   = 500;   // provera kartice uživo (2× u sekundi, na slici pola rezolucije)
 const CARD_WAIT_MS    = 6000;  // najduže čekanje na dobro postavljenu karticu, pa se snima i bez nje
 const IS_MOBILE = typeof navigator !== 'undefined'
   && (navigator.userAgentData?.mobile ?? /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent));
-const vfovFor = (frameW, frameH) =>
-  parseVfovOverride(window.location.search) ?? vfovPrior({ mobile: IS_MOBILE, frameW, frameH });
+const vfovFor = (frameW, frameH, rear = false) =>
+  parseVfovOverride(window.location.search) ?? vfovPrior({ mobile: IS_MOBILE, frameW, frameH, rear });
 
 // Očekivani položaj kartice (za obris na ekranu): na čelu, iznad obrva
 function drawCardGuide(ctx, l, r, ok) {
@@ -157,12 +157,12 @@ function drawCardGuide(ctx, l, r, ok) {
   ctx.stroke(); ctx.restore();
 }
 
-// Frejm kamere u punoj rezoluciji, ogledalski okrenut (kao što ga korisnik vidi)
-function grabMirrored(video) {
+// Frejm kamere u punoj rezoluciji; prednja kamera ogledalski (kao što ga korisnik vidi), zadnja ne
+function grabFrame(video, mirror = true) {
   const c = document.createElement('canvas');
   c.width = video.videoWidth; c.height = video.videoHeight;
   const g = c.getContext('2d', { willReadFrequently: true });
-  g.save(); g.scale(-1, 1); g.translate(-c.width, 0); g.drawImage(video, 0, 0); g.restore();
+  g.save(); if (mirror) { g.scale(-1, 1); g.translate(-c.width, 0); } g.drawImage(video, 0, 0); g.restore();
   return c;
 }
 
@@ -207,6 +207,7 @@ const GLOBAL_CSS = `
   @keyframes spin { to { transform: rotate(360deg); } }
 
   video { width: 100%; height: 100%; object-fit: cover; display: block; transform: scaleX(-1); }
+  video.rear { transform: none; }
   canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
 
   button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid #00b8ff; outline-offset: 2px; }
@@ -401,6 +402,9 @@ const PDMeasurement = () => {
   const lumaRef        = useRef({ luma: NaN, sharp: NaN, n: 0 });
   const cardLiveRef    = useRef({ t: 0, status: 'missing', goodSince: null, log: [] }); // provera kartice uživo
   const distBlockRef   = useRef(null); // od kada upozorenje o udaljenosti blokira snimak
+  // Režim: 'self' (prednja kamera) ili 'assisted' (druga osoba drži telefon, zadnja kamera)
+  const [mode, setMode] = useState('self');
+  const modeRef = useRef('self');
   const halfCanvasRef  = useRef(null);
   const burstRef       = useRef(null);  // { frames, prefill, ... } dok traje rafal pri snimku
   const captureDistanceRef = useRef(null); // udaljenost po MediaPipe-u (mm) — samo rezerva i debug
@@ -477,11 +481,11 @@ const PDMeasurement = () => {
   }, []);
 
   // ── Camera ─────────────────────────────────────────────────────────────
-  const startCamera = async () => {
+  const startCamera = async (m = modeRef.current) => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         // Veća rezolucija (portret 3:4): detekcija radi na umanjenoj slici, snimak u punoj
-        video: { facingMode: 'user', width: { ideal: 1080 }, height: { ideal: 1440 } },
+        video: { facingMode: m === 'assisted' ? { ideal: 'environment' } : 'user', width: { ideal: 1080 }, height: { ideal: 1440 } },
         audio: false,
       });
       if (!videoRef.current) return;
@@ -520,12 +524,13 @@ const PDMeasurement = () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     // Rafal pri snimku: sledeći frejmovi se samo hvataju, bez detekcije lica
     if (burstRef.current) {
-      burstRef.current.frames.push(grabMirrored(video));
+      burstRef.current.frames.push(grabFrame(video, modeRef.current !== 'assisted'));
       if (burstRef.current.frames.length >= BURST_FRAMES) { finalizeCapture(video); return; }
       animationRef.current = requestAnimationFrame(detectFace); return;
     }
 
-    ctx.save(); ctx.scale(-1, 1); ctx.translate(-canvas.width, 0);
+    const mirror = modeRef.current !== 'assisted';
+    ctx.save(); if (mirror) { ctx.scale(-1, 1); ctx.translate(-canvas.width, 0); }
 
     try {
       const results = faceMesh.detectForVideo(video, performance.now());
@@ -575,7 +580,7 @@ const PDMeasurement = () => {
       const cl = cardLiveRef.current, now = performance.now();
       const dMp = Number.isFinite(pose?.distanceMm) ? estimateFaceDistance(pose.distanceMm, IS_MOBILE) : NaN;
       const dEst = Number.isFinite(cl.dCard) && now - cl.dCardAt < 1500 ? cl.dCard : dMp;
-      let dist = distanceStatusMm(dEst, irisD);
+      let dist = distanceStatusMm(dEst, irisD, mirror ? DIST_MAX_MM : DIST_MAX_ASSISTED_MM);
       if (dist !== 'ok') {
         if (!distBlockRef.current) distBlockRef.current = now;
         if (now - distBlockRef.current > DIST_BLOCK_MAX_MS && irisD >= 30) dist = 'ok'; // ne zaglavljuj merenje
@@ -600,11 +605,11 @@ const PDMeasurement = () => {
             const full = det && { ...det, widthPx: det.widthPx * 2, markers: det.markers.map(m => ({ x: m.x * 2, y: m.y * 2 })) };
             const ev = evaluateCard({
               det: full, minConfidence: CARD_DETECT_MIN_CONFIDENCE, pupils: [{ x: lX, y: lY }, { x: rX, y: rY }],
-              frameH: canvas.height, vfovDeg: vfovFor(canvas.width, canvas.height), dFaceMm: dMp,
+              frameH: canvas.height, vfovDeg: vfovFor(canvas.width, canvas.height, !mirror), dFaceMm: dMp,
             });
             cl.status = ev.status;
             if (full && full.confidence >= CARD_DETECT_MIN_CONFIDENCE) {
-              cl.dCard = distanceFromCard({ cardPx: full.widthPx, frameH: canvas.height, vfovDeg: vfovFor(canvas.width, canvas.height) });
+              cl.dCard = distanceFromCard({ cardPx: full.widthPx, frameH: canvas.height, vfovDeg: vfovFor(canvas.width, canvas.height, !mirror) });
               cl.dCardAt = now;
             }
             if (debug) { cl.log.push({ status: ev.status, above: ev.above, ratio: ev.ratio, conf: det?.confidence }); if (cl.log.length > 40) cl.log.shift(); }
@@ -627,8 +632,8 @@ const PDMeasurement = () => {
       });
       if (hist.length > HISTORY_SIZE) hist.shift();
       const isStill = hist.length >= HISTORY_SIZE
-        && stddev(hist.map(h => h.lX)) < STILL_THRESHOLD
-        && stddev(hist.map(h => h.rX)) < STILL_THRESHOLD;
+        && stddev(hist.map(h => h.lX)) < STILL_FRAC * irisD
+        && stddev(hist.map(h => h.rX)) < STILL_FRAC * irisD;
 
       if (debug) {
         const tick = dbgTickRef.current, now = performance.now();
@@ -673,8 +678,9 @@ const PDMeasurement = () => {
             };
           }
           // Ceo kadar (bez isecanja na 3:4); zenice u px snimka (ogledalski), leva na ekranu prva
-          const prefill = [{ x: vW - mLX, y: mLY }, { x: vW - mRX, y: mRY }].sort((p, q) => p.x - q.x);
-          burstRef.current = { frames: [grabMirrored(video)], prefill, vW, vH };
+          const mx = (x) => (mirror ? vW - x : x);
+          const prefill = [{ x: mx(mLX), y: mLY }, { x: mx(mRX), y: mRY }].sort((p, q) => p.x - q.x);
+          burstRef.current = { frames: [grabFrame(video, mirror)], prefill, vW, vH };
           animationRef.current = requestAnimationFrame(detectFace); return;
         }
       } else { cntdwnStartRef.current = null; setCountdown(null); }
@@ -704,7 +710,7 @@ const PDMeasurement = () => {
     prefillPupilsRef.current = prefill;
     setSnapSize({ w: vW, h: vH });
     setPupilMarkers(prefill);
-    captureFrameRef.current = { vW, vH };
+    captureFrameRef.current = { vW, vH, rear: modeRef.current === 'assisted' };
     cardDetectRef.current = det ? { ...det, used: autoOk } : { used: false };
     if (debug && captureMetaRef.current) {
       captureMetaRef.current.burst = results.map(r => (r ? { w: Number(r.widthPx.toFixed(1)), conf: Number(r.confidence.toFixed(2)) } : null));
@@ -755,7 +761,7 @@ const PDMeasurement = () => {
     );
     // B4: udaljenost iz poznate širine kartice (FOV po klasi uređaja); MediaPipe samo kao rezerva
     const frame = captureFrameRef.current;
-    const vfovDeg = frame ? vfovFor(frame.vW, frame.vH) : NaN;
+    const vfovDeg = frame ? vfovFor(frame.vW, frame.vH, frame.rear) : NaN;
     const distanceCardMm = frame ? distanceFromCard({ cardPx, frameH: frame.vH, vfovDeg, cardPosition }) : NaN;
     const useCard = Number.isFinite(distanceCardMm);
     const distanceMm = useCard ? distanceCardMm : captureDistanceRef.current;
@@ -778,7 +784,7 @@ const PDMeasurement = () => {
           screen: `${window.screen.width}x${window.screen.height}`,
           viewport: `${window.innerWidth}x${window.innerHeight}`,
           dpr: window.devicePixelRatio, zoomed,
-          source: source ?? null, embed: embed ?? null,
+          source: source ?? null, embed: embed ?? null, mode: modeRef.current,
         },
         cardSrcPx: cardPx,
         pupilSrcPx: pupilPx,
@@ -894,6 +900,25 @@ const PDMeasurement = () => {
     captureDistanceRef.current = null; captureFrameRef.current = null; cardDetectRef.current = null; setCardAuto(false);
     captureMetaRef.current = null; prefillPupilsRef.current = null; setReport(null); setLiveDbg(null);
     burstRef.current = null; distBlockRef.current = null; cardLiveRef.current = { t: 0, status: 'missing', goodSince: null, log: [] };
+  };
+  // Početak merenja: 'self' (prednja kamera) ili 'assisted' (druga osoba, zadnja kamera)
+  const startMeasurement = (m) => {
+    modeRef.current = m; setMode(m);
+    unlockSfx(); voice.stop();
+    voice.enqueue(m === 'assisted' ? ['P01', 'P02', 'G02', 'G03'] : ['G01', 'G02', 'G03', 'G04']);
+    startCamera(m); setStep('detecting');
+  };
+  // Prelazak između prednje i zadnje kamere usred merenja (npr. telefon teško stabilizovati)
+  const switchMode = (m) => {
+    videoRef.current?.srcObject?.getTracks().forEach(t => t.stop());
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setCameraReady(false); setFaceDetected(false); setFaceStatus('none');
+    faceHistoryRef.current = []; cntdwnStartRef.current = null; setCountdown(null); lastTimeRef.current = -1;
+    burstRef.current = null; distBlockRef.current = null; cardLiveRef.current = { t: 0, status: 'missing', goodSince: null, log: [] };
+    modeRef.current = m; setMode(m);
+    voice.stop();
+    voice.enqueue(m === 'assisted' ? ['P01', 'P02'] : ['G01', 'G02']);
+    startCamera(m);
   };
   const retryDetect = () => {
     faceHistoryRef.current = []; cntdwnStartRef.current = null; setCountdown(null); lastTimeRef.current = -1;
@@ -1109,14 +1134,14 @@ const PDMeasurement = () => {
               </div>
 
               {/* Start button */}
-              <button className="btn-primary" onClick={() => {
-                // Klik otključava zvuk (autoplay pravila) — uvodne poruke kreću odmah
-                unlockSfx();
-                voice.stop(); voice.enqueue(['G01', 'G02', 'G03', 'G04']);
-                startCamera(); setStep('detecting');
-              }} disabled={!faceMesh}>
+              <button className="btn-primary" onClick={() => startMeasurement('self')} disabled={!faceMesh}>
                 {faceMesh ? <><IcoCameraBtn /><span>Započni merenje</span></> : 'Učitavanje...'}
               </button>
+              {IS_MOBILE && (
+                <button className="btn-secondary" onClick={() => startMeasurement('assisted')} disabled={!faceMesh} style={{ marginTop: -24 }}>
+                  Uz pomoć druge osobe (zadnja kamera)
+                </button>
+              )}
             </div>
 
             {/* Footer */}
@@ -1175,7 +1200,7 @@ const PDMeasurement = () => {
                 {countdown === 0 ? '📸' : countdown}
               </div>
             )}
-            <video ref={videoRef} playsInline muted />
+            <video ref={videoRef} playsInline muted className={mode === 'assisted' ? 'rear' : undefined} />
             <canvas ref={canvasRef} />
             {debug && <DebugOverlay live={liveDbg} camera={cameraInfoRef.current} delegate={delegateRef.current} phantom={phantom} />}
 
@@ -1211,6 +1236,12 @@ const PDMeasurement = () => {
           </div>
 
           <Caption caption={caption} large={settings.largeText} />
+
+          {IS_MOBILE && (
+            <button className="btn-secondary" onClick={() => switchMode(mode === 'assisted' ? 'self' : 'assisted')} style={{ marginTop: 4 }}>
+              {mode === 'assisted' ? 'Merim sam (prednja kamera)' : 'Uz pomoć druge osobe (zadnja kamera)'}
+            </button>
+          )}
 
           {/* Cancel button */}
           <button className="btn-secondary" onClick={reset} style={{ marginTop: 4, marginBottom: 24 }}>

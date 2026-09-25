@@ -17,11 +17,14 @@ export const DIST_BLOCK_MAX_MS = 8000;
 export const DIST_MAX_MM = 600;
 export const MIN_IPD_PX = 60;
 
-export function distanceStatusMm(dEstMm, ipdPx) {
+// Asistirani režim (druga osoba drži telefon, zadnja kamera): dozvoljeno i dalje, do ~1 m.
+export const DIST_MAX_ASSISTED_MM = 1000;
+
+export function distanceStatusMm(dEstMm, ipdPx, maxMm = DIST_MAX_MM) {
   if (!(ipdPx >= MIN_IPD_PX)) return 'far';
   if (!Number.isFinite(dEstMm)) return 'ok';          // bez procene ne blokiramo
   if (dEstMm < DIST_MIN_MM) return 'close';
-  if (dEstMm > DIST_MAX_MM) return 'far';
+  if (dEstMm > maxMm) return 'far';
   return 'ok';
 }
 

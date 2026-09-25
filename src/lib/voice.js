@@ -10,6 +10,9 @@ export const PROMPTS = {
   G06: { file: 'G06_pridjite', text: 'Priđite bliže.' },
   G07: { file: 'G07_odmaknite', text: 'Odmaknite se malo.' },
   G08: { file: 'G08_ispravite_glavu', text: 'Ispravite glavu i gledajte pravo u kameru.' },
+  // Asistirani režim (P01–P02 još nisu snimljeni — samo titl)
+  P01: { file: null, text: 'Režim uz pomoć druge osobe. Osoba koja meri drži telefon oko pola metra od vašeg lica, zadnjom kamerom prema vama.' },
+  P02: { file: null, text: 'Gledajte pravo u kameru na poleđini telefona.' },
   // G09: još nije snimljen — samo titl (file: null)
   G09: { file: null, text: 'Ne vidim karticu. Prislonite je na čelo, iznad obrva.' },
   // G10: novi tekst — potrebno ponovno snimanje (docs/zvucni-signali.md)
