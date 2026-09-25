@@ -98,6 +98,8 @@ titl za oboje. Ostale poruke (G05–G28) se koriste i u ovom režimu.
 | P03 | `P03_priblizite` | predaleko | Približite telefon. |
 | P04 | `P04_udaljite` | preblizu | Udaljite telefon. |
 | P05 | `P05_drzite_mirno` | telefon se trese | Držite telefon mirno. |
+| P06 | `P06_jos_jedan_snimak` | posle 1. snimka (zadnja kamera) | Još jedan snimak. Spustite karticu i ponovo je prislonite na čelo. **(novo — zasad samo titl)** |
+| P07 | `P07_snimci_se_razlikuju` | dva snimka se razlikuju > 2 mm | Snimci se razlikuju. Još jedan snimak. **(novo — zasad samo titl)** |
 
 ## 7. Zvučni efekti (bez govora)
 
@@ -126,6 +128,6 @@ G01–G08, G10–G14, G18–G23 (19 fajlova).
 
 **Nedostaje:** G09 („Ne vidim karticu. Prislonite je na čelo, iznad obrva, i držite je za gornju ivicu."), G03A („Držite je za gornju ivicu.") — potreban za proveru kartice uživo.
 **Snimiti ponovo:** G10 — tekst usklađen sa standardnim uputstvom „kartica na čelu, iznad obrva" (2026-09-25).
-**Prioritet za asistirani režim (zadnja kamera):** P01–P04 — već se prikazuju kao titl.
+**Prioritet za asistirani režim (zadnja kamera):** P01–P04, P06, P07 — već se prikazuju kao titl.
 **Sledeće serije:** G24–G28, P05, N40–N80, N_IPO.
 Originali ostaju kod Marka (master); u repozitorijumu su samo obrađene verzije.

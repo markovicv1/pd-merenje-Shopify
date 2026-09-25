@@ -63,3 +63,21 @@ describe('computeCorrectedPd bez konvergencije (fantom)', () => {
   it('čelo, 60mm, d=400 → samo paralaksa 61', () =>
     expect(computeCorrectedPd({ rawPdMm: 60, distanceMm: 400, cardPosition: 'forehead', includeVergence: false })).toBe(61));
 });
+
+import { shotsNeeded, combineShots, computeCorrectedPdExact, computeCorrectedPd } from './pdMath.js';
+
+describe('više snimaka (asistirani režim)', () => {
+  it('traži dva snimka', () => {
+    expect(shotsNeeded([])).toBe(2);
+    expect(shotsNeeded([63.1])).toBe(2);
+  });
+  it('dva bliska snimka su dovoljna', () => expect(shotsNeeded([62.0, 63.5])).toBe(2));
+  it('dva udaljena snimka → treći', () => expect(shotsNeeded([61.0, 63.5])).toBe(3));
+  it('posle trećeg nema više', () => expect(shotsNeeded([61.0, 63.5, 62.2])).toBe(3));
+  it('dva snimka → prosek zaokružen na 0,5', () => expect(combineShots([61.4, 63.0])).toBe(62));
+  it('tri snimka → medijana', () => expect(combineShots([61.0, 66.0, 62.2])).toBe(62));
+  it('zaokružena i nezaokružena verzija se slažu', () => {
+    const a = { rawPdMm: 60, distanceMm: 500, cardPosition: 'forehead' };
+    expect(computeCorrectedPd(a)).toBe(Math.round(computeCorrectedPdExact(a) * 2) / 2);
+  });
+});

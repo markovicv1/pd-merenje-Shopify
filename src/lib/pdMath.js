@@ -42,8 +42,32 @@ export function correctVergence(pdMm, distanceMm) {
 }
 
 // includeVergence: false samo za fantom (odštampane oči ne konvergiraju).
-export function computeCorrectedPd({ rawPdMm, distanceMm, cardPosition, includeVergence = true }) {
+export function computeCorrectedPd(args) {
+  return roundToHalfMm(computeCorrectedPdExact(args));
+}
+
+// Isto, bez zaokruživanja — za prosek više snimaka.
+export function computeCorrectedPdExact({ rawPdMm, distanceMm, cardPosition, includeVergence = true }) {
   const d = sanitizeDistanceMm(distanceMm);
   const pd = correctParallax(rawPdMm, d, cardPosition);
-  return roundToHalfMm(includeVergence ? correctVergence(pd, d) : pd);
+  return includeVergence ? correctVergence(pd, d) : pd;
+}
+
+// Više nezavisnih snimaka (asistirani režim): kartica se između snimaka ponovo prislanja,
+// pa se greške držanja kartice i oznaka delimično poništavaju.
+export const SHOTS_BASE = 2;
+export const SHOTS_MAX = 3;
+export const SHOTS_MAX_DIFF_MM = 2; // dva snimka koja se razlikuju više od ovoga → treći snimak
+
+export function shotsNeeded(values) {
+  if (values.length < SHOTS_BASE) return SHOTS_BASE;
+  if (values.length === SHOTS_BASE && Math.abs(values[0] - values[1]) > SHOTS_MAX_DIFF_MM) return SHOTS_MAX;
+  return values.length;
+}
+
+// 2 snimka → prosek; 3 → medijana (odbacuje odstupajući snimak). Zaokruženo na 0,5 mm.
+export function combineShots(values) {
+  if (!values.length) return NaN;
+  const v = values.length >= 3 ? median(values) : values.reduce((a, b) => a + b, 0) / values.length;
+  return roundToHalfMm(v);
 }

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { median, computeCorrectedPd, classifyCardPosition } from './lib/pdMath.js';
+import { median, computeCorrectedPdExact, roundToHalfMm, classifyCardPosition, shotsNeeded, combineShots } from './lib/pdMath.js';
 import { decomposeFacialMatrix, isPoseFrontal } from './lib/headPose.js';
 import { resolveReturnTarget, ALLOWED_ORIGINS } from './lib/returnTarget.js';
 import { parseDebugFlags, irisDiameterPx, buildReport, IRIS_H_EDGES } from './lib/debugReport.js';
@@ -410,6 +410,7 @@ const PDMeasurement = () => {
   // Režim: 'self' (prednja kamera) ili 'assisted' (druga osoba drži telefon, zadnja kamera)
   const [mode, setMode] = useState('self');
   const modeRef = useRef('self');
+  const shotsRef = useRef([]); // asistirani režim: rezultati prethodnih snimaka (nezaokruženi PD + podaci za debug)
   const halfCanvasRef  = useRef(null);
   const burstRef       = useRef(null);  // { frames, prefill, ... } dok traje rafal pri snimku
   const captureDistanceRef = useRef(null); // udaljenost po MediaPipe-u (mm) — samo rezerva i debug
@@ -782,12 +783,13 @@ const PDMeasurement = () => {
     const distanceCardMm = frame ? distanceFromCard({ cardPx, frameH: frame.vH, vfovDeg, cardPosition }) : NaN;
     const useCard = Number.isFinite(distanceCardMm);
     const distanceMm = useCard ? distanceCardMm : captureDistanceRef.current;
-    const pd = computeCorrectedPd({
+    const pdExact = computeCorrectedPdExact({
       rawPdMm: rawPd,
       distanceMm,
       cardPosition,
       includeVergence: !phantom,
     });
+    const pd = roundToHalfMm(pdExact);
     const [min, max] = source === 'vto' ? [48, 80] : [40, 80.5];
 
     if (debug) {
@@ -827,6 +829,32 @@ const PDMeasurement = () => {
       return;
     }
     setError(null);
+
+    // Asistirani režim: više nezavisnih snimaka (kartica se ponovo prislanja), rezultat je prosek/medijana
+    if (modeRef.current === 'assisted') {
+      const shots = [...shotsRef.current, {
+        pd: pdExact, rawPdMm: rawPd, cardPx, pupilPx, distanceMm, cardAuto: !!cardDetectRef.current?.used,
+      }];
+      shotsRef.current = shots;
+      const values = shots.map(x => x.pd);
+      if (values.length < shotsNeeded(values)) {
+        play('success'); buzz(40);
+        startNextShot(values.length === 2 ? 'P07' : 'P06');
+        return;
+      }
+      const final = combineShots(values);
+      if (debug) setReport(rep => rep && {
+        ...rep,
+        capture: { ...rep.capture, shots: shots.map(x => ({
+          pd: Number(x.pd.toFixed(2)), raw: Number(x.rawPdMm.toFixed(2)), cardPx: Number(x.cardPx.toFixed(1)),
+          pupilPx: Number(x.pupilPx.toFixed(1)), distanceMm: Math.round(x.distanceMm), cardAuto: x.cardAuto,
+        })) },
+        measurement: { ...rep.measurement, finalPdMm: final, shotPdMm: pd },
+      });
+      voice.stop(); play('success'); buzz(60);
+      setFinalPD(final); setStep('result');
+      return;
+    }
     voice.stop(); play('success'); buzz(60);
     setFinalPD(pd); setStep('result');
   };
@@ -917,10 +945,11 @@ const PDMeasurement = () => {
     captureDistanceRef.current = null; captureFrameRef.current = null; cardDetectRef.current = null; setCardAuto(false);
     captureMetaRef.current = null; prefillPupilsRef.current = null; setReport(null); setLiveDbg(null);
     burstRef.current = null; distBlockRef.current = null; cardLiveRef.current = { t: 0, status: 'missing', goodSince: null, log: [] };
+    shotsRef.current = [];
   };
   // Početak merenja: 'self' (prednja kamera) ili 'assisted' (druga osoba, zadnja kamera)
   const startMeasurement = (m) => {
-    modeRef.current = m; setMode(m);
+    modeRef.current = m; setMode(m); shotsRef.current = [];
     unlockSfx(); voice.stop();
     voice.enqueue(m === 'assisted' ? ['P01', 'P02', 'G02', 'G03', 'G03A'] : ['G01', 'G02', 'G03', 'G03A', 'G04']);
     startCamera(m); setStep('detecting');
@@ -932,10 +961,19 @@ const PDMeasurement = () => {
     setCameraReady(false); setFaceDetected(false); setFaceStatus('none');
     faceHistoryRef.current = []; cntdwnStartRef.current = null; setCountdown(null); lastTimeRef.current = -1;
     burstRef.current = null; distBlockRef.current = null; cardLiveRef.current = { t: 0, status: 'missing', goodSince: null, log: [] };
-    modeRef.current = m; setMode(m);
+    modeRef.current = m; setMode(m); shotsRef.current = [];
     voice.stop();
     voice.enqueue(m === 'assisted' ? ['P01', 'P02'] : ['G01', 'G02']);
     startCamera(m);
+  };
+  // Sledeći snimak u asistiranom režimu (prethodni rezultati ostaju u shotsRef)
+  const startNextShot = (promptId) => {
+    faceHistoryRef.current = []; cntdwnStartRef.current = null; setCountdown(null); lastTimeRef.current = -1;
+    captureDistanceRef.current = null; captureFrameRef.current = null; cardDetectRef.current = null; setCardAuto(false);
+    captureMetaRef.current = null; prefillPupilsRef.current = null; setLiveDbg(null);
+    burstRef.current = null; distBlockRef.current = null; cardLiveRef.current = { t: 0, status: 'missing', goodSince: null, log: [] };
+    voice.stop(); voice.enqueue([promptId]);
+    setSnapshotUrl(null); setStep('detecting'); startCamera();
   };
   const retryDetect = () => {
     faceHistoryRef.current = []; cntdwnStartRef.current = null; setCountdown(null); lastTimeRef.current = -1;
@@ -1013,6 +1051,11 @@ const PDMeasurement = () => {
         <div style={{ maxWidth: MAX_W, width: '100%', alignSelf: 'center', padding: '8px 16px 6px', display: 'flex', alignItems: 'center', gap: 14, fontSize: 12, color: '#8c8c8c', flexShrink: 0 }}>
           <span><span style={{ color: '#FF6B6B', fontWeight: 700 }}>[ ]</span> ivice kartice</span>
           <span><span style={{ color: '#00b8ff' }}>◎</span> zenice</span>
+          {mode === 'assisted' && (
+            <span style={{ color: '#fff', fontWeight: 600 }}>
+              Snimak {shotsRef.current.length + 1} od {shotsNeeded(shotsRef.current.map(x => x.pd))}
+            </span>
+          )}
           <button type="button" onClick={() => setZoomed(z => !z)} style={{ marginLeft: 'auto', color: '#00b8ff', fontSize: 12, fontWeight: 600, padding: '4px 0' }}>
             {zoomed ? 'Ceo snimak' : 'Uvećaj'}
           </button>

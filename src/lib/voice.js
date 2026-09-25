@@ -17,6 +17,8 @@ export const PROMPTS = {
   P02: { file: null, text: 'Gledajte pravo u kameru na poleđini telefona.' },
   P03: { file: null, text: 'Približite telefon.' },
   P04: { file: null, text: 'Udaljite telefon.' },
+  P06: { file: null, text: 'Još jedan snimak. Spustite karticu i ponovo je prislonite na čelo.' },
+  P07: { file: null, text: 'Snimci se razlikuju. Još jedan snimak.' },
   // G09: još nije snimljen — samo titl (file: null)
   G09: { file: null, text: 'Ne vidim karticu. Prislonite je na čelo, iznad obrva, i držite je za gornju ivicu.' },
   // G10: novi tekst — potrebno ponovno snimanje (docs/zvucni-signali.md)
