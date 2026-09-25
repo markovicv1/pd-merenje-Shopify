@@ -9,8 +9,11 @@ export const FACE_DISTANCE_K = { mobile: 1.0, desktop: 1.33 };
 export const estimateFaceDistance = (dMpMm, mobile) =>
   dMpMm * (mobile ? FACE_DISTANCE_K.mobile : FACE_DISTANCE_K.desktop);
 
-// Ciljna udaljenost (mm): testeri su na telefonu bili na 26–33 cm, gde su korekcije ~6–7% i osetljive.
-export const DIST_MIN_MM = 380;
+// Ciljna udaljenost (mm). Testeri na 26–33 cm su posle kalibracije mereni tačno, pa je donja granica 28 cm.
+// (38 cm je na starom Android telefonu teralo korisnika na ~1 m, gde zenice više nisu prepoznate.)
+export const DIST_MIN_MM = 280;
+// Upozorenje o udaljenosti ne blokira snimak duže od ovoga — merenje nikad ne sme da se zaglavi.
+export const DIST_BLOCK_MAX_MS = 8000;
 export const DIST_MAX_MM = 600;
 export const MIN_IPD_PX = 60;
 

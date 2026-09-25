@@ -65,7 +65,7 @@ Za sledeća stakla nije dovoljna samo PD vrednost, već i mere koje se uzimaju u
 
 ## Pre merenja
 
-- **Kartica na čelu, iznad obrva.**
+- **Kartica (kreditna, lična karta ili zdravstvena) na čelu, iznad obrva.**
 - **Skinite naočare** — odsjaji i ram ometaju merenje.
 - **Skinite sočiva u boji** — kamera tada vidi odštampanu šaru, a ne vaše oko.
 - **Obična providna sočiva možete ostaviti.**

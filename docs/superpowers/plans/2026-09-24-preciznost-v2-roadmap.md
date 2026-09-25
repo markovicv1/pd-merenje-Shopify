@@ -6,7 +6,7 @@
 
 ## Standardno uputstvo (Marko, 2026-09-25)
 
-**„Kartica na čelu, iznad obrva."** — isto na svim mestima u aplikaciji (uvod, glas, titlovi, panel pristupačnosti).
+**„Kartica (kreditna, lična karta ili zdravstvena) na čelu, iznad obrva."** (pojašnjenje kartice dodato 2026-09-25) — isto na svim mestima u aplikaciji (uvod, glas, titlovi, panel pristupačnosti).
 Sve što od toga odstupa tretira se kao prirodno ponašanje korisnika, koje aplikacija treba da podnese
 (provera kartice uživo, kalibracija razmaka kartice na stvarnim podacima).
 
@@ -50,8 +50,8 @@ na svim testiranim ekranima (375×667 … 1920×1080, Chromium).
 | max | 2,5 mm | 1,5 mm |
 | unakrsna provera po osobi | — | SD 1,1 mm, max 2,0 mm |
 
-Desktop merenja Marka (+6 mm u odnosu na PD 60) izuzeta: dva testa sa lenjirom na istom snimku potvrđuju
-~63 mm na slici; referenca se proverava.
+Desktop merenja Marka: referenca iz salona (60) se pokazala pogrešnom — Marko je lenjirom izmerio ~65 mm,
+aplikacija posle kalibracije daje 65–65,5 mm (desktop EMEET C960 takođe u okviru ±0,5 mm).
 
 **Uvedeno posle testiranja** (grana `claude/happy-mendel-t00n04`):
 1. `CARD_DEPTH_OFFSET_MM.forehead` 10 → 6 mm.
@@ -59,7 +59,7 @@ Desktop merenja Marka (+6 mm u odnosu na PD 60) izuzeta: dva testa sa lenjirom n
 3. Provera kartice uživo 2× u sekundi (`src/lib/cardCheck.js`): nije pronađena / previsoko (centar > 1,2 IPD
    iznad zenica) / odmaknuta od lica (udaljenost iz kartice < 0,88 × udaljenost lica). Snimak čeka dobro
    postavljenu karticu najviše 6 s, zatim snima i bez nje (ručne oznake).
-4. Uslov udaljenosti u mm: 38–60 cm (MediaPipe × 1,0 telefon / 1,33 desktop, kalibrisano na testerima);
+4. Uslov udaljenosti u mm: 28–60 cm (prvobitno 38 cm — na starom Android telefonu teralo korisnika na ~1 m); prednost ima udaljenost iz kartice prepoznate uživo, a upozorenje ne blokira duže od 8 s (MediaPipe × 1,0 telefon / 1,33 desktop, kalibrisano na testerima);
    testeri su na telefonu bili na 26–33 cm.
 5. Ceo kadar kamere umesto isecanja na 3:4 (iPhone/Android isporučuju 1440×1080 — ranije se gubilo 44% širine).
 6. Rafal od 3 frejma pri snimku; kartica se detektuje na svakom, koristi se medijana samo ako se slažu (≤ 2%).

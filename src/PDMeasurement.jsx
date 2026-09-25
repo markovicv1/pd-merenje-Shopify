@@ -6,7 +6,7 @@ import { parseDebugFlags, irisDiameterPx, buildReport, IRIS_H_EDGES } from './li
 import { zoomRect, cardPrefill, rawPdFromMarkers, distPx } from './lib/adjustGeometry.js';
 import { detectCardEdges, toGray, CARD_DETECT_MIN_CONFIDENCE } from './lib/cardDetect.js';
 import { distanceFromCard, vfovPrior, parseVfovOverride } from './lib/cardDistance.js';
-import { estimateFaceDistance, distanceStatusMm, evaluateCard, aggregateBurst } from './lib/cardCheck.js';
+import { estimateFaceDistance, distanceStatusMm, evaluateCard, aggregateBurst, DIST_BLOCK_MAX_MS } from './lib/cardCheck.js';
 import { meanLuma, laplacianVariance, eyeForeheadRoi, MIN_LUMA } from './lib/captureGate.js';
 import { createVoice, STATUS_PROMPT, STATUS_HOLD_MS } from './lib/voice.js';
 import { sfx, unlockSfx, vibrate } from './lib/sfx.js';
@@ -400,6 +400,7 @@ const PDMeasurement = () => {
   const cntdwnStartRef = useRef(null);
   const lumaRef        = useRef({ luma: NaN, sharp: NaN, n: 0 });
   const cardLiveRef    = useRef({ t: 0, status: 'missing', goodSince: null, log: [] }); // provera kartice uživo
+  const distBlockRef   = useRef(null); // od kada upozorenje o udaljenosti blokira snimak
   const halfCanvasRef  = useRef(null);
   const burstRef       = useRef(null);  // { frames, prefill, ... } dok traje rafal pri snimku
   const captureDistanceRef = useRef(null); // udaljenost po MediaPipe-u (mm) — samo rezerva i debug
@@ -570,14 +571,20 @@ const PDMeasurement = () => {
       }
 
       // Udaljenost u milimetrima (MediaPipe × korekcija po klasi uređaja), ne u pikselima kadra
-      const dEst = Number.isFinite(pose?.distanceMm) ? estimateFaceDistance(pose.distanceMm, IS_MOBILE) : NaN;
-      const dist = distanceStatusMm(dEst, irisD);
+      // Prednost ima udaljenost iz kartice prepoznate uživo (tačna na svakom uređaju), inače MediaPipe × k
+      const cl = cardLiveRef.current, now = performance.now();
+      const dMp = Number.isFinite(pose?.distanceMm) ? estimateFaceDistance(pose.distanceMm, IS_MOBILE) : NaN;
+      const dEst = Number.isFinite(cl.dCard) && now - cl.dCardAt < 1500 ? cl.dCard : dMp;
+      let dist = distanceStatusMm(dEst, irisD);
+      if (dist !== 'ok') {
+        if (!distBlockRef.current) distBlockRef.current = now;
+        if (now - distBlockRef.current > DIST_BLOCK_MAX_MS && irisD >= 30) dist = 'ok'; // ne zaglavljuj merenje
+      } else distBlockRef.current = null;
       const faceStatusNow = dist !== 'ok' ? dist : !poseOk ? 'pose' : lq.luma < MIN_LUMA ? 'dark' : 'good';
 
       // Kartica uživo: 2× u sekundi, na slici pola rezolucije — da li je na čelu iznad obrva i prislonjena
-      const cl = cardLiveRef.current, now = performance.now();
-      if (faceStatusNow === 'good') {
-        if (!cl.goodSince) cl.goodSince = now;
+      if (faceStatusNow === 'good' || dist !== 'ok') {
+        if (faceStatusNow === 'good' && !cl.goodSince) cl.goodSince = now;
         if (now - cl.t > CARD_CHECK_MS) {
           cl.t = now;
           try {
@@ -593,13 +600,18 @@ const PDMeasurement = () => {
             const full = det && { ...det, widthPx: det.widthPx * 2, markers: det.markers.map(m => ({ x: m.x * 2, y: m.y * 2 })) };
             const ev = evaluateCard({
               det: full, minConfidence: CARD_DETECT_MIN_CONFIDENCE, pupils: [{ x: lX, y: lY }, { x: rX, y: rY }],
-              frameH: canvas.height, vfovDeg: vfovFor(canvas.width, canvas.height), dFaceMm: dEst,
+              frameH: canvas.height, vfovDeg: vfovFor(canvas.width, canvas.height), dFaceMm: dMp,
             });
             cl.status = ev.status;
+            if (full && full.confidence >= CARD_DETECT_MIN_CONFIDENCE) {
+              cl.dCard = distanceFromCard({ cardPx: full.widthPx, frameH: canvas.height, vfovDeg: vfovFor(canvas.width, canvas.height) });
+              cl.dCardAt = now;
+            }
             if (debug) { cl.log.push({ status: ev.status, above: ev.above, ratio: ev.ratio, conf: det?.confidence }); if (cl.log.length > 40) cl.log.shift(); }
           } catch (e) { cl.status = 'missing'; }
         }
-      } else cl.goodSince = null;
+      }
+      if (faceStatusNow !== 'good') cl.goodSince = null;
       // Snimak čeka dobro postavljenu karticu najviše CARD_WAIT_MS, pa se snima i bez nje (ručne oznake)
       const cardBlocks = faceStatusNow === 'good' && cl.status !== 'ok' && cl.goodSince && now - cl.goodSince < CARD_WAIT_MS;
       const status = cardBlocks ? `card-${cl.status}` : faceStatusNow;
@@ -881,13 +893,13 @@ const PDMeasurement = () => {
     faceHistoryRef.current = []; cntdwnStartRef.current = null; lastTimeRef.current = -1;
     captureDistanceRef.current = null; captureFrameRef.current = null; cardDetectRef.current = null; setCardAuto(false);
     captureMetaRef.current = null; prefillPupilsRef.current = null; setReport(null); setLiveDbg(null);
-    burstRef.current = null; cardLiveRef.current = { t: 0, status: 'missing', goodSince: null, log: [] };
+    burstRef.current = null; distBlockRef.current = null; cardLiveRef.current = { t: 0, status: 'missing', goodSince: null, log: [] };
   };
   const retryDetect = () => {
     faceHistoryRef.current = []; cntdwnStartRef.current = null; setCountdown(null); lastTimeRef.current = -1;
     captureDistanceRef.current = null; captureFrameRef.current = null; cardDetectRef.current = null; setCardAuto(false);
     captureMetaRef.current = null; prefillPupilsRef.current = null; setReport(null); setLiveDbg(null);
-    burstRef.current = null; cardLiveRef.current = { t: 0, status: 'missing', goodSince: null, log: [] };
+    burstRef.current = null; distBlockRef.current = null; cardLiveRef.current = { t: 0, status: 'missing', goodSince: null, log: [] };
     voice.stop();
     setSnapshotUrl(null); setStep('detecting'); startCamera();
   };
@@ -1060,7 +1072,7 @@ const PDMeasurement = () => {
                       <IcoCardGraphic />
                     </div>
                   </BlueCell>
-                  <span>Kartica na čelu, iznad obrva. Skinite naočare i sočiva u boji.</span>
+                  <span>Kartica (kreditna, lična karta ili zdravstvena) na čelu, iznad obrva. Skinite naočare i sočiva u boji.</span>
                 </div>
 
                 {/* Row 2: gledajte u kameru */}

@@ -75,7 +75,8 @@ import { distanceStatusMm, estimateFaceDistance, cardCenterAbovePupils, evaluate
 describe('cardCheck', () => {
   const pupils = [{ x: 400, y: 600 }, { x: 600, y: 600 }];
   it('udaljenost u mm: blizu / daleko / ok; niska rezolucija → far', () => {
-    expect(distanceStatusMm(300, 200)).toBe('close');
+    expect(distanceStatusMm(250, 200)).toBe('close');
+    expect(distanceStatusMm(300, 200)).toBe('ok');
     expect(distanceStatusMm(700, 200)).toBe('far');
     expect(distanceStatusMm(450, 200)).toBe('ok');
     expect(distanceStatusMm(450, 40)).toBe('far');
