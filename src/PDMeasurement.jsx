@@ -978,7 +978,7 @@ const PDMeasurement = () => {
                       <IcoCardGraphic />
                     </div>
                   </BlueCell>
-                  <span>Karticu prislonite ravno na čelo, iznad obrva. Skinite naočare i sočiva u boji.</span>
+                  <span>Kartica na čelu, iznad obrva. Skinite naočare i sočiva u boji.</span>
                 </div>
 
                 {/* Row 2: gledajte u kameru */}

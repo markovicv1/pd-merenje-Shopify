@@ -34,7 +34,7 @@ Sva uputstva su uvek i ispisana na ekranu, bez obzira na podešavanje zvuka.
 
 ## Ako vam je teško da držite telefon i karticu
 
-- **Zalepite karticu selotejpom** na čelo — ruke su slobodne, a kartica stoji ravno.
+- **Zalepite karticu selotejpom** na čelo, iznad obrva — ruke su slobodne, a kartica stoji ravno.
 - **Naslonite telefon** na nešto stabilno (knjige, stalak) u visini očiju.
 - Izaberite režim **uz pomoć druge osobe**.
 - Za podešavanje oznaka **nema vremenskog ograničenja**. Na računaru oznake možete pomerati i strelicama na tastaturi.
@@ -65,6 +65,7 @@ Za sledeća stakla nije dovoljna samo PD vrednost, već i mere koje se uzimaju u
 
 ## Pre merenja
 
+- **Kartica na čelu, iznad obrva.**
 - **Skinite naočare** — odsjaji i ram ometaju merenje.
 - **Skinite sočiva u boji** — kamera tada vidi odštampanu šaru, a ne vaše oko.
 - **Obična providna sočiva možete ostaviti.**

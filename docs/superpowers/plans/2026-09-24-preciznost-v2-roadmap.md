@@ -4,6 +4,12 @@
 > **Posle ovog plana:** `2026-07-15-face-shape-v1.md` (oblik lica)
 > **Prateći dokumenti:** `docs/zvucni-signali.md` (lista za snimanje), `docs/pristupacnost-saveti.md` (sadržaj za ikonicu pristupačnosti)
 
+## Standardno uputstvo (Marko, 2026-09-25)
+
+**„Kartica na čelu, iznad obrva."** — isto na svim mestima u aplikaciji (uvod, glas, titlovi, panel pristupačnosti).
+Sve što od toga odstupa tretira se kao prirodno ponašanje korisnika, koje aplikacija treba da podnese
+(provera kartice uživo, kalibracija razmaka kartice na stvarnim podacima).
+
 ## Problem
 
 Aplikacija se koristi na telefonima, laptopovima i desktop računarima i daje različite rezultate za istu osobu.

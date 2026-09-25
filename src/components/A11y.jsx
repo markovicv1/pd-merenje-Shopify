@@ -104,7 +104,7 @@ export function AccessibilityPanel({ open, onClose, settings, onChange, canVibra
 
         <H>Ako vam je teško da držite telefon i karticu</H>
         <Ul items={[
-          'Zalepite karticu selotejpom na čelo — ruke su slobodne, a kartica stoji ravno.',
+          'Zalepite karticu selotejpom na čelo, iznad obrva — ruke su slobodne, a kartica stoji ravno.',
           'Naslonite telefon na nešto stabilno (knjige, stalak) u visini očiju.',
           'Zamolite drugu osobu da drži telefon.',
           'Za podešavanje oznaka nema vremenskog ograničenja. Na računaru oznake možete pomerati i strelicama na tastaturi.',
@@ -128,6 +128,7 @@ export function AccessibilityPanel({ open, onClose, settings, onChange, canVibra
 
         <H>Pre merenja</H>
         <Ul items={[
+          'Kartica na čelu, iznad obrva.',
           'Skinite naočare — odsjaji i ram ometaju merenje.',
           'Skinite sočiva u boji — kamera tada vidi odštampanu šaru, a ne vaše oko.',
           'Obična providna sočiva možete ostaviti.',

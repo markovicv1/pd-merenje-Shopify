@@ -10,7 +10,8 @@ export const PROMPTS = {
   G06: { file: 'G06_pridjite', text: 'Priđite bliže.' },
   G07: { file: 'G07_odmaknite', text: 'Odmaknite se malo.' },
   G08: { file: 'G08_ispravite_glavu', text: 'Ispravite glavu i gledajte pravo u kameru.' },
-  G10: { file: 'G10_kartica_nagnuta', text: 'Kartica je nagnuta. Prislonite je ravno uz čelo.' },
+  // G10: novi tekst — potrebno ponovno snimanje (docs/zvucni-signali.md)
+  G10: { file: 'G10_kartica_nagnuta', text: 'Kartica je nagnuta. Prislonite je ravno na čelo, iznad obrva.' },
   G11: { file: 'G11_premalo_svetla', text: 'Premalo je svetla. Okrenite se ka prozoru ili lampi.' },
   G12: { file: 'G12_slika_mutna', text: 'Slika je mutna. Mirujte ili se malo odmaknite.' },
   G13: { file: 'G13_odlicno_mirujte', text: 'Odlično. Mirujte.' },
