@@ -7,7 +7,7 @@ import { zoomRect, cardPrefill, rawPdFromMarkers, distPx } from './lib/adjustGeo
 import { detectCardEdges, toGray, CARD_DETECT_MIN_CONFIDENCE } from './lib/cardDetect.js';
 import { distanceFromCard, vfovPrior, parseVfovOverride } from './lib/cardDistance.js';
 import { estimateFaceDistance, distanceStatusMm, evaluateCard, aggregateBurst, DIST_BLOCK_MAX_MS, DIST_MAX_MM, DIST_MAX_ASSISTED_MM } from './lib/cardCheck.js';
-import { meanLuma, laplacianVariance, eyeForeheadRoi, MIN_LUMA } from './lib/captureGate.js';
+import { meanLuma, laplacianVariance, eyeForeheadRoi, MIN_LUMA, stillness } from './lib/captureGate.js';
 import { createVoice, STATUS_PROMPT, STATUS_PROMPT_ASSISTED, STATUS_HOLD_MS } from './lib/voice.js';
 import { sfx, unlockSfx, vibrate } from './lib/sfx.js';
 import { loadSettings, saveSettings } from './lib/a11ySettings.js';
@@ -128,7 +128,6 @@ const IcoResultHeader = () => (
 const LEFT_IRIS   = 468;
 const RIGHT_IRIS  = 473;
 const HISTORY_SIZE    = 25;
-const STILL_FRAC      = 0.03;  // mirovanje: SD položaja zenica < 3% razmaka zenica (ne zavisi od rezolucije)
 const COUNTDOWN_MS    = 3000;
 const BURST_FRAMES    = 3;     // rafal pri snimku: kartica se detektuje na svakom, uzima se medijana
 const CARD_CHECK_MS   = 500;   // provera kartice uživo (2× u sekundi, na slici pola rezolucije)
@@ -290,6 +289,7 @@ d(MP) ${fmt(live?.dMm, 0)} mm · proc. ${fmt(live?.dEst, 0)} mm
 kartica ${live?.card ?? '–'}
 yaw ${fmt(live?.yaw)}° pitch ${fmt(live?.pitch)}°
 svetlo ${fmt(live?.luma, 0)} · oštrina ${fmt(live?.sharp, 0)}
+mirno: razmera ${fmt(live?.stillScale * 100)}% (<2.5) · brzina ${fmt(live?.stillSpeed * 100)}% (<2.5)
 status ${live?.status ?? '–'}`}
   </div>
 );
@@ -631,9 +631,9 @@ const PDMeasurement = () => {
         irisR: irisDiameterPx(lm, IRIS_H_EDGES.right, canvas.width, canvas.height),
       });
       if (hist.length > HISTORY_SIZE) hist.shift();
-      const isStill = hist.length >= HISTORY_SIZE
-        && stddev(hist.map(h => h.lX)) < STILL_FRAC * irisD
-        && stddev(hist.map(h => h.rX)) < STILL_FRAC * irisD;
+      // Mirovanje: stabilna razmera i mala brzina (pomeranje lica po kadru zbog tremora je dozvoljeno)
+      const still = stillness(hist, HISTORY_SIZE, cntdwnStartRef.current ? 1.5 : 1);
+      const isStill = still.ok;
 
       if (debug) {
         const tick = dbgTickRef.current, now = performance.now();
@@ -643,7 +643,7 @@ const PDMeasurement = () => {
             fps: tick.since ? tick.frames * 1000 / (now - tick.since) : 0,
             w: canvas.width, h: canvas.height, ipdPx: irisD, ipdPct: irisD / canvas.width * 100,
             yaw: pose?.yawDeg, pitch: pose?.pitchDeg, dMm: pose?.distanceMm, dEst, status, card: cl.status,
-            luma: lq.luma, sharp: lq.sharp,
+            luma: lq.luma, sharp: lq.sharp, stillScale: still.scale, stillSpeed: still.speed,
           });
           tick.frames = 0; tick.since = now;
         }
@@ -690,18 +690,29 @@ const PDMeasurement = () => {
 
   // Kraj rafala: kartica se detektuje na svakom frejmu; medijana širine ako se frejmovi slažu (≤2%)
   function finalizeCapture(video) {
-    const { frames, prefill, vW, vH } = burstRef.current;
+    const { frames, prefill: prefillHist, vW, vH } = burstRef.current;
     burstRef.current = null;
     const results = frames.map((c) => {
       try {
         const img = c.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, c.width, c.height);
-        return detectCardEdges({ gray: toGray(img.data, c.width, c.height), width: c.width, height: c.height, pupils: prefill });
+        return detectCardEdges({ gray: toGray(img.data, c.width, c.height), width: c.width, height: c.height, pupils: prefillHist });
       } catch { return null; }
     });
     const agg = aggregateBurst(results, CARD_DETECT_MIN_CONFIDENCE);
     const idx = agg ? agg.index : frames.length - 1;
     const det = results[idx];
     const autoOk = !!agg && agg.agree;
+    // Zenice sa samog snimljenog frejma (telefon u ruci se pomera, pa medijana iz istorije može da kasni)
+    let prefill = prefillHist, prefillSource = 'istorija';
+    try {
+      const lm = faceMesh.detectForVideo(frames[idx], performance.now()).faceLandmarks?.[0];
+      if (lm) {
+        const pts = [LEFT_IRIS, RIGHT_IRIS].map(i => ({ x: lm[i].x * vW, y: lm[i].y * vH })).sort((p, q) => p.x - q.x);
+        const ipdH = Math.hypot(prefillHist[1].x - prefillHist[0].x, prefillHist[1].y - prefillHist[0].y);
+        const ipdF = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+        if (ipdH > 0 && Math.abs(ipdF / ipdH - 1) < 0.1) { prefill = pts; prefillSource = 'frejm'; }
+      }
+    } catch { /* ostaje medijana iz istorije */ }
     setSnapshotUrl(frames[idx].toDataURL('image/jpeg', 0.92));
     // Kamera se gasi čim je slika uhvaćena (privatnost + baterija)
     video.srcObject?.getTracks().forEach(t => t.stop());
@@ -714,6 +725,7 @@ const PDMeasurement = () => {
     cardDetectRef.current = det ? { ...det, used: autoOk } : { used: false };
     if (debug && captureMetaRef.current) {
       captureMetaRef.current.burst = results.map(r => (r ? { w: Number(r.widthPx.toFixed(1)), conf: Number(r.confidence.toFixed(2)) } : null));
+      captureMetaRef.current.prefillSource = prefillSource;
       captureMetaRef.current.burstSpread = agg ? Number((agg.spread * 100).toFixed(2)) : null;
     }
     setCardAuto(autoOk);

@@ -53,3 +53,31 @@ export function eyeForeheadRoi(l, r, frameW, frameH) {
   const y1 = Math.min(frameH, cy + 0.3 * ipd);
   return { x: x0, y: y0, w: Math.max(0, x1 - x0), h: Math.max(0, y1 - y0) };
 }
+
+// Mirovanje za snimak. Ne gledamo apsolutni položaj zenica u kadru: kada se telefon drži u ruci (tremor,
+// bez optičke stabilizacije), celo lice se pomera po kadru, a to merenju ne smeta — PD se računa iz odnosa
+// zenica i kartice na JEDNOM frejmu. Bitno je:
+//  - razmera: razmak zenica (px) stabilan → udaljenost se ne menja;
+//  - brzina: pomeraj između uzastopnih frejmova mali → slika nije razmazana.
+export const STILL_SCALE_FRAC = 0.025; // SD razmaka zenica < 2,5% razmaka
+export const STILL_SPEED_FRAC = 0.025; // medijana pomeraja po frejmu < 2,5% razmaka zenica
+export const STILL_SPEED_WINDOW = 10;  // poslednjih N frejmova za brzinu
+
+// relax > 1: blaži prag dok odbrojavanje već traje (da ga jedan trzaj ne prekine)
+export function stillness(hist, minFrames, relax = 1) {
+  if (!hist || hist.length < minFrames) return { ok: false, scale: NaN, speed: NaN };
+  const ipd = hist.map(h => Math.hypot(h.rX - h.lX, h.rY - h.lY));
+  const mean = ipd.reduce((a, b) => a + b, 0) / ipd.length;
+  const sd = Math.sqrt(ipd.reduce((a, b) => a + (b - mean) ** 2, 0) / ipd.length);
+  const tail = hist.slice(-STILL_SPEED_WINDOW);
+  const steps = [];
+  for (let i = 1; i < tail.length; i++) {
+    const a = tail[i - 1], b = tail[i];
+    steps.push(Math.hypot((b.lX + b.rX - a.lX - a.rX) / 2, (b.lY + b.rY - a.lY - a.rY) / 2));
+  }
+  steps.sort((a, b) => a - b);
+  const med = steps.length ? steps[steps.length >> 1] : 0;
+  const scale = mean > 0 ? sd / mean : Infinity;
+  const speed = mean > 0 ? med / mean : Infinity;
+  return { ok: scale < STILL_SCALE_FRAC * relax && speed < STILL_SPEED_FRAC * relax, scale, speed };
+}

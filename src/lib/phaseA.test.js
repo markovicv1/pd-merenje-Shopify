@@ -114,3 +114,26 @@ describe('a11ySettings', () => {
     expect(loadSettings(s)).toEqual(DEFAULT_SETTINGS);
   });
 });
+
+import { stillness } from './captureGate.js';
+
+describe('stillness (telefon u ruci)', () => {
+  const mk = (n, f) => Array.from({ length: n }, (_, i) => f(i));
+  const face = (dx, dy, ipd = 211) => ({ lX: 600 + dx, lY: 500 + dy, rX: 600 + ipd + dx, rY: 500 + dy });
+
+  it('dozvoljava tremor: lice se pomera po kadru ±15 px, razmera ista', () => {
+    const h = mk(25, i => face(15 * Math.sin(i / 5), 10 * Math.cos(i / 4)));
+    expect(stillness(h, 25).ok).toBe(true);
+  });
+  it('odbija brzo pomeranje (razmazana slika)', () => {
+    const h = mk(25, i => face(i * 12, 0));
+    expect(stillness(h, 25).ok).toBe(false);
+  });
+  it('odbija promenu udaljenosti (razmak zenica se menja)', () => {
+    const h = mk(25, i => face(0, 0, 190 + i * 2));
+    expect(stillness(h, 25).ok).toBe(false);
+  });
+  it('traži pun prozor frejmova', () => {
+    expect(stillness(mk(10, () => face(0, 0)), 25).ok).toBe(false);
+  });
+});
