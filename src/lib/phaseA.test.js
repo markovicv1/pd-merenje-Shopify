@@ -85,9 +85,9 @@ describe('voice.shouldPlay', () => {
     expect(shouldPlay({ id: 'G06', now: 10000, lastPlayedAt: { G06: 10000 - REPEAT_GAP_MS + 1 } })).toBe(false);
     expect(shouldPlay({ id: 'G06', now: 10000, lastPlayedAt: { G06: 10000 - REPEAT_GAP_MS } })).toBe(true);
   });
-  it('svaki status ima poruku sa fajlom i tekstom', () => {
+  it('svaki status ima poruku sa tekstom i fajlom (ili null = samo titl, još nije snimljeno)', () => {
     for (const id of Object.values(STATUS_PROMPT)) {
-      expect(PROMPTS[id].file).toMatch(/^G\d\d_/);
+      if (PROMPTS[id].file !== null) expect(PROMPTS[id].file).toMatch(/^G\d\d_/);
       expect(PROMPTS[id].text.length).toBeGreaterThan(3);
     }
   });

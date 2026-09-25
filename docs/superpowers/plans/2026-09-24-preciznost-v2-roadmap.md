@@ -38,6 +38,36 @@ na svim testiranim ekranima (375×667 … 1920×1080, Chromium).
 
 ---
 
+## Rezultat testiranja i završni paket (2026-09-25)
+
+**Testiranje:** 7 osoba (desktop EMEET C960, iPhone, novi iPhone ultraširoka, Android), 6 sa referentnim PD-om
+(oftalmolog/optometrista), 10 merenja sa referencom (bez merenja sa odmaknutom karticom).
+
+| | pre kalibracije (čelo 10 mm) | posle (čelo 6 mm) |
+|---|---|---|
+| prosečna greška | +0,85 mm | 0,0 mm |
+| SD | 1,0 mm | 1,0 mm |
+| max | 2,5 mm | 1,5 mm |
+| unakrsna provera po osobi | — | SD 1,1 mm, max 2,0 mm |
+
+Desktop merenja Marka (+6 mm u odnosu na PD 60) izuzeta: dva testa sa lenjirom na istom snimku potvrđuju
+~63 mm na slici; referenca se proverava.
+
+**Uvedeno posle testiranja** (grana `claude/happy-mendel-t00n04`):
+1. `CARD_DEPTH_OFFSET_MM.forehead` 10 → 6 mm.
+2. Obris kartice na ekranu kamere (na čelu, iznad obrva); zelen kad je kartica dobro postavljena.
+3. Provera kartice uživo 2× u sekundi (`src/lib/cardCheck.js`): nije pronađena / previsoko (centar > 1,2 IPD
+   iznad zenica) / odmaknuta od lica (udaljenost iz kartice < 0,88 × udaljenost lica). Snimak čeka dobro
+   postavljenu karticu najviše 6 s, zatim snima i bez nje (ručne oznake).
+4. Uslov udaljenosti u mm: 38–60 cm (MediaPipe × 1,0 telefon / 1,33 desktop, kalibrisano na testerima);
+   testeri su na telefonu bili na 26–33 cm.
+5. Ceo kadar kamere umesto isecanja na 3:4 (iPhone/Android isporučuju 1440×1080 — ranije se gubilo 44% širine).
+6. Rafal od 3 frejma pri snimku; kartica se detektuje na svakom, koristi se medijana samo ako se slažu (≤ 2%).
+7. Detekcija kartice: pokrivenost ivica < 30% → ne koristi se automatski.
+
+Poznato ograničenje: palac preko bočne ivice kartice može zavarati detekciju (2 od 9 prihvaćenih u testu);
+korisnici su oznake ispravili ručno. Otvoreno pitanje: dopuna uputstva „držite je za gornju ivicu".
+
 ## Faza 0 — Merenje trenutnog stanja (prvo!)
 
 Bez podataka ne znamo stvarni udeo svakog izvora po uređaju.

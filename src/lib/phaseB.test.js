@@ -48,8 +48,8 @@ describe('detectCardEdges', () => {
 
 describe('cardDistance (B4)', () => {
   it('žižna daljina iz FOV-a', () => expect(focalPx(1440, 90)).toBeCloseTo(720, 6));
-  it('kartica 85,6 mm na 1440 px, FOV 90°, 123,28 px → karta na 500 mm, zenice 510', () =>
-    expect(distanceFromCard({ cardPx: 720 * 85.6 / 500, frameH: 1440, vfovDeg: 90 })).toBeCloseTo(510, 6));
+  it('kartica 85,6 mm na 1440 px, FOV 90°, 123,28 px → karta na 500 mm, zenice 506', () =>
+    expect(distanceFromCard({ cardPx: 720 * 85.6 / 500, frameH: 1440, vfovDeg: 90 })).toBeCloseTo(506, 6));
   it('prior po uređaju', () => {
     expect(vfovPrior({ mobile: true, frameW: 1080, frameH: 1440 })).toBe(VFOV_PRIOR.phonePortrait);
     expect(vfovPrior({ mobile: true, frameW: 1440, frameH: 1080 })).toBe(VFOV_PRIOR.phoneLandscape);
@@ -67,5 +67,44 @@ describe('cardDistance (B4)', () => {
   it('EMEET kalibracija: 292,8 px na 1440 px, 45° → ~53 cm (korisnik: ~55 cm)', () => {
     const d = distanceFromCard({ cardPx: 292.8, frameH: 1440, vfovDeg: 45 });
     expect(d).toBeGreaterThan(480); expect(d).toBeLessThan(560);
+  });
+});
+
+import { distanceStatusMm, estimateFaceDistance, cardCenterAbovePupils, evaluateCard, aggregateBurst } from './cardCheck.js';
+
+describe('cardCheck', () => {
+  const pupils = [{ x: 400, y: 600 }, { x: 600, y: 600 }];
+  it('udaljenost u mm: blizu / daleko / ok; niska rezolucija → far', () => {
+    expect(distanceStatusMm(300, 200)).toBe('close');
+    expect(distanceStatusMm(700, 200)).toBe('far');
+    expect(distanceStatusMm(450, 200)).toBe('ok');
+    expect(distanceStatusMm(450, 40)).toBe('far');
+    expect(distanceStatusMm(NaN, 200)).toBe('ok');
+  });
+  it('procena udaljenosti lica: desktop korigovan', () => {
+    expect(estimateFaceDistance(390, false)).toBeCloseTo(518.7, 1);
+    expect(estimateFaceDistance(300, true)).toBe(300);
+  });
+  it('centar kartice iznad zenica u IPD', () =>
+    expect(cardCenterAbovePupils([{ x: 360, y: 460 }, { x: 640, y: 460 }], pupils)).toBeCloseTo(0.7, 6));
+  const det = (y, w = 272, confidence = 0.8) => ({ confidence, widthPx: w, markers: [{ x: 500 - w / 2, y }, { x: 500 + w / 2, y }] });
+  const base = { minConfidence: 0.5, pupils, frameH: 1080, vfovDeg: 55 };
+  it('kartica nije pronađena / nepouzdana → missing', () => {
+    expect(evaluateCard({ ...base, det: null }).status).toBe('missing');
+    expect(evaluateCard({ ...base, det: det(460, 272, 0.3) }).status).toBe('missing');
+  });
+  it('kartica previsoko (linija kose) → high', () =>
+    expect(evaluateCard({ ...base, det: det(330), dFaceMm: 450 }).status).toBe('high'));
+  it('kartica odmaknuta od lica → off-face; na licu → ok', () => {
+    // 272 px na 1080 px, 55° → kartica ~ 336 mm (+6 mm)
+    expect(evaluateCard({ ...base, det: det(460), dFaceMm: 450 }).status).toBe('off-face');
+    expect(evaluateCard({ ...base, det: det(460), dFaceMm: 350 }).status).toBe('ok');
+  });
+  it('rafal: medijana, slaganje, premalo pouzdanih → null', () => {
+    const a = aggregateBurst([{ confidence: 0.9, widthPx: 300 }, { confidence: 0.9, widthPx: 302 }, { confidence: 0.9, widthPx: 301 }], 0.5);
+    expect(a.widthPx).toBe(301); expect(a.index).toBe(2); expect(a.agree).toBe(true);
+    const b = aggregateBurst([{ confidence: 0.9, widthPx: 300 }, { confidence: 0.9, widthPx: 320 }], 0.5);
+    expect(b.agree).toBe(false);
+    expect(aggregateBurst([{ confidence: 0.9, widthPx: 300 }, null, { confidence: 0.2, widthPx: 1 }], 0.5)).toBeNull();
   });
 });

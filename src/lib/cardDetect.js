@@ -220,7 +220,9 @@ export function detectCardEdges({ gray, width, height, pupils, mask = null }) {
   // tačne detekcije max RMS 0,30–1,29 px, pogrešne 1,64–1,90 px.
   const maxRms = Math.max(la.rms, lb.rms);
   const straight = Math.max(0, Math.min(1, (1.6 - maxRms) / 1.1));
-  const confidence = 0.6 * straight + 0.4 * Math.min(1, coverage / 0.5);
+  let confidence = 0.6 * straight + 0.4 * Math.min(1, coverage / 0.5);
+  // Ivice vidljive na manje od 30% visine kartice (prsti, odsjaj): ne verujemo automatski (tester, 2026-09-25: 20%)
+  if (coverage < 0.3) confidence = Math.min(confidence, 0.45);
 
   return {
     markers: [L, R],

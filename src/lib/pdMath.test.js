@@ -40,7 +40,7 @@ describe('classifyCardPosition (Y u %, raste nadole)', () => {
 });
 
 describe('correctParallax', () => {
-  it('čelo: 60mm na 400mm → 61.5', () => expect(correctParallax(60, 400, 'forehead')).toBeCloseTo(61.5, 6));
+  it('čelo: 60mm na 400mm → 60.9', () => expect(correctParallax(60, 400, 'forehead')).toBeCloseTo(60.9, 6));
   it('nos: 60mm na 400mm → 63', () => expect(correctParallax(60, 400, 'nose')).toBeCloseTo(63, 6));
   it('nepoznata pozicija tretira se kao nos', () =>
     expect(correctParallax(60, 400, undefined)).toBeCloseTo(63, 6));
@@ -51,8 +51,8 @@ describe('correctVergence', () => {
 });
 
 describe('computeCorrectedPd (kompozicija + 0.5mm)', () => {
-  it('čelo, 60mm, d=400 → 63', () =>
-    expect(computeCorrectedPd({ rawPdMm: 60, distanceMm: 400, cardPosition: 'forehead' })).toBe(63));
+  it('čelo, 60mm, d=400 → 62.5', () =>
+    expect(computeCorrectedPd({ rawPdMm: 60, distanceMm: 400, cardPosition: 'forehead' })).toBe(62.5));
   it('nos, 60mm, d=400 → 64.5', () =>
     expect(computeCorrectedPd({ rawPdMm: 60, distanceMm: 400, cardPosition: 'nose' })).toBe(64.5));
   it('nevalidna udaljenost koristi default 450', () =>
@@ -60,6 +60,6 @@ describe('computeCorrectedPd (kompozicija + 0.5mm)', () => {
 });
 
 describe('computeCorrectedPd bez konvergencije (fantom)', () => {
-  it('čelo, 60mm, d=400 → samo paralaksa 61.5', () =>
-    expect(computeCorrectedPd({ rawPdMm: 60, distanceMm: 400, cardPosition: 'forehead', includeVergence: false })).toBe(61.5));
+  it('čelo, 60mm, d=400 → samo paralaksa 61', () =>
+    expect(computeCorrectedPd({ rawPdMm: 60, distanceMm: 400, cardPosition: 'forehead', includeVergence: false })).toBe(61));
 });

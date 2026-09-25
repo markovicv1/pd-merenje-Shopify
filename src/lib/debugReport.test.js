@@ -33,16 +33,16 @@ describe('buildReport', () => {
 
   it('faktori korekcija (čelo, d=400)', () => {
     const m = buildReport(base).measurement;
-    expect(m.parallaxFactor).toBe(1.025);
+    expect(m.parallaxFactor).toBe(1.015);
     expect(m.vergenceFactor).toBeCloseTo(1.0263, 4);
-    expect(m.correctedPdMm).toBeCloseTo(63.11, 2);
+    expect(m.correctedPdMm).toBeCloseTo(62.5, 2);
   });
 
   it('fantom: bez konvergencije', () => {
     const rep = buildReport({ ...base, phantom: true });
     expect(rep.mode).toBe('fantom');
     expect(rep.measurement.vergenceFactor).toBe(1);
-    expect(rep.measurement.correctedPdMm).toBe(61.5);
+    expect(rep.measurement.correctedPdMm).toBe(60.9);
   });
 
   it('prečnik šarenice u mm preko skale kartice', () =>

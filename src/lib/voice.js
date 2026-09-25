@@ -10,6 +10,8 @@ export const PROMPTS = {
   G06: { file: 'G06_pridjite', text: 'Priđite bliže.' },
   G07: { file: 'G07_odmaknite', text: 'Odmaknite se malo.' },
   G08: { file: 'G08_ispravite_glavu', text: 'Ispravite glavu i gledajte pravo u kameru.' },
+  // G09: još nije snimljen — samo titl (file: null)
+  G09: { file: null, text: 'Ne vidim karticu. Prislonite je na čelo, iznad obrva.' },
   // G10: novi tekst — potrebno ponovno snimanje (docs/zvucni-signali.md)
   G10: { file: 'G10_kartica_nagnuta', text: 'Kartica je nagnuta. Prislonite je ravno na čelo, iznad obrva.' },
   G11: { file: 'G11_premalo_svetla', text: 'Premalo je svetla. Okrenite se ka prozoru ili lampi.' },
@@ -25,7 +27,10 @@ export const PROMPTS = {
 };
 
 // Poruka za status detekcije (prioritet je već sadržan u samom statusu).
-export const STATUS_PROMPT = { none: 'G05', far: 'G06', close: 'G07', pose: 'G08', dark: 'G11', good: 'G13' };
+export const STATUS_PROMPT = {
+  none: 'G05', far: 'G06', close: 'G07', pose: 'G08', dark: 'G11', good: 'G13',
+  'card-missing': 'G09', 'card-high': 'G03', 'card-off-face': 'G03',
+};
 
 export const REPEAT_GAP_MS = 4000;  // ista poruka se ne ponavlja pre 4 s
 export const STATUS_HOLD_MS = 1000; // status mora da traje 1 s pre nego što se izgovori
@@ -61,7 +66,7 @@ export function createVoice({ baseUrl, onCaption }) {
     current = id;
     lastPlayedAt[id] = Date.now();
     onCaption?.({ id, text: p.text });
-    if (enabled && audio) {
+    if (enabled && audio && p.file) {
       audio.src = `${baseUrl}${p.file}.m4a`;
       audio.onended = () => clearCaptionLater(600);
       clearCaptionLater(captionMs(p.text) + 4000); // osigurač ako onended ne stigne

@@ -1,7 +1,9 @@
 // ── Kalibracione konstante ──────────────────────────────────────────────
-// Početne vrednosti; finalno podešavanje empirijskom validacijom (pupilometar).
+// Kalibrisano 2026-09-25 na 6 osoba / 10 merenja sa referentnim PD-om (oftalmolog/optometrista),
+// iPhone + Android: čelo 10 → 6 mm (prosečna greška +0,85 → 0,0 mm; sve unutar ±1,5 mm;
+// unakrsna provera po osobi: SD 1,1 mm, max 2,0 mm). Nos nije kalibrisan (uputstvo je samo čelo).
 export const CARD_WIDTH_MM = 85.6;
-export const CARD_DEPTH_OFFSET_MM = { forehead: 10, nose: 20 }; // kartica ispred ravni zenica
+export const CARD_DEPTH_OFFSET_MM = { forehead: 6, nose: 20 }; // kartica ispred ravni zenica
 export const EYE_ROTATION_OFFSET_MM = 10.5; // ulazna pupila → centar rotacije oka
 export const DEFAULT_DISTANCE_MM = 450;
 export const MIN_DISTANCE_MM = 250;

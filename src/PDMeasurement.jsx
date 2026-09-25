@@ -6,7 +6,8 @@ import { parseDebugFlags, irisDiameterPx, buildReport, IRIS_H_EDGES } from './li
 import { zoomRect, cardPrefill, rawPdFromMarkers, distPx } from './lib/adjustGeometry.js';
 import { detectCardEdges, toGray, CARD_DETECT_MIN_CONFIDENCE } from './lib/cardDetect.js';
 import { distanceFromCard, vfovPrior, parseVfovOverride } from './lib/cardDistance.js';
-import { distanceStatus, meanLuma, laplacianVariance, eyeForeheadRoi, MIN_LUMA } from './lib/captureGate.js';
+import { estimateFaceDistance, distanceStatusMm, evaluateCard, aggregateBurst } from './lib/cardCheck.js';
+import { meanLuma, laplacianVariance, eyeForeheadRoi, MIN_LUMA } from './lib/captureGate.js';
 import { createVoice, STATUS_PROMPT, STATUS_HOLD_MS } from './lib/voice.js';
 import { sfx, unlockSfx, vibrate } from './lib/sfx.js';
 import { loadSettings, saveSettings } from './lib/a11ySettings.js';
@@ -129,6 +130,41 @@ const RIGHT_IRIS  = 473;
 const HISTORY_SIZE    = 25;
 const STILL_THRESHOLD = 4;
 const COUNTDOWN_MS    = 3000;
+const BURST_FRAMES    = 3;     // rafal pri snimku: kartica se detektuje na svakom, uzima se medijana
+const CARD_CHECK_MS   = 500;   // provera kartice uživo (2× u sekundi, na slici pola rezolucije)
+const CARD_WAIT_MS    = 6000;  // najduže čekanje na dobro postavljenu karticu, pa se snima i bez nje
+const IS_MOBILE = typeof navigator !== 'undefined'
+  && (navigator.userAgentData?.mobile ?? /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent));
+const vfovFor = (frameW, frameH) =>
+  parseVfovOverride(window.location.search) ?? vfovPrior({ mobile: IS_MOBILE, frameW, frameH });
+
+// Očekivani položaj kartice (za obris na ekranu): na čelu, iznad obrva
+function drawCardGuide(ctx, l, r, ok) {
+  const [p0, p1] = l.x <= r.x ? [l, r] : [r, l];
+  const ipd = Math.hypot(p1.x - p0.x, p1.y - p0.y); if (!(ipd > 0)) return;
+  const ang = Math.atan2(p1.y - p0.y, p1.x - p0.x);
+  const w = ipd * 85.6 / 63, h = w * 53.98 / 85.6, up = 0.75 * ipd;
+  const cx = (p0.x + p1.x) / 2 + Math.sin(ang) * up, cy = (p0.y + p1.y) / 2 - Math.cos(ang) * up;
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang);
+  ctx.strokeStyle = ok ? '#4ade80' : 'rgba(255,255,255,0.8)'; ctx.lineWidth = 3;
+  ctx.setLineDash(ok ? [] : [10, 8]);
+  const rr = w * 0.037;
+  ctx.beginPath();
+  ctx.moveTo(-w / 2 + rr, -h / 2); ctx.lineTo(w / 2 - rr, -h / 2); ctx.arcTo(w / 2, -h / 2, w / 2, -h / 2 + rr, rr);
+  ctx.lineTo(w / 2, h / 2 - rr); ctx.arcTo(w / 2, h / 2, w / 2 - rr, h / 2, rr);
+  ctx.lineTo(-w / 2 + rr, h / 2); ctx.arcTo(-w / 2, h / 2, -w / 2, h / 2 - rr, rr);
+  ctx.lineTo(-w / 2, -h / 2 + rr); ctx.arcTo(-w / 2, -h / 2, -w / 2 + rr, -h / 2, rr);
+  ctx.stroke(); ctx.restore();
+}
+
+// Frejm kamere u punoj rezoluciji, ogledalski okrenut (kao što ga korisnik vidi)
+function grabMirrored(video) {
+  const c = document.createElement('canvas');
+  c.width = video.videoWidth; c.height = video.videoHeight;
+  const g = c.getContext('2d', { willReadFrequently: true });
+  g.save(); g.scale(-1, 1); g.translate(-c.width, 0); g.drawImage(video, 0, 0); g.restore();
+  return c;
+}
 
 function stddev(arr) {
   const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
@@ -249,7 +285,8 @@ const DebugOverlay = ({ live, camera, delegate, phantom }) => (
 cam ${camera?.width ?? '?'}×${camera?.height ?? '?'} @${fmt(camera?.frameRate, 0)}
 frame ${live ? `${live.w}×${live.h}` : '–'} · ${fmt(live?.fps, 0)} fps
 IPD ${fmt(live?.ipdPx)} px (${fmt(live?.ipdPct)}% š.)
-d(MP) ${fmt(live?.dMm, 0)} mm
+d(MP) ${fmt(live?.dMm, 0)} mm · proc. ${fmt(live?.dEst, 0)} mm
+kartica ${live?.card ?? '–'}
 yaw ${fmt(live?.yaw)}° pitch ${fmt(live?.pitch)}°
 svetlo ${fmt(live?.luma, 0)} · oštrina ${fmt(live?.sharp, 0)}
 status ${live?.status ?? '–'}`}
@@ -362,6 +399,9 @@ const PDMeasurement = () => {
   const faceHistoryRef = useRef([]);
   const cntdwnStartRef = useRef(null);
   const lumaRef        = useRef({ luma: NaN, sharp: NaN, n: 0 });
+  const cardLiveRef    = useRef({ t: 0, status: 'missing', goodSince: null, log: [] }); // provera kartice uživo
+  const halfCanvasRef  = useRef(null);
+  const burstRef       = useRef(null);  // { frames, prefill, ... } dok traje rafal pri snimku
   const captureDistanceRef = useRef(null); // udaljenost po MediaPipe-u (mm) — samo rezerva i debug
   const captureFrameRef    = useRef(null); // { vW, vH } frejma kamere pri snimku (za FOV → udaljenost iz kartice)
   const cardDetectRef      = useRef(null); // rezultat automatske detekcije kartice (B1)
@@ -477,6 +517,13 @@ const PDMeasurement = () => {
     }
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Rafal pri snimku: sledeći frejmovi se samo hvataju, bez detekcije lica
+    if (burstRef.current) {
+      burstRef.current.frames.push(grabMirrored(video));
+      if (burstRef.current.frames.length >= BURST_FRAMES) { finalizeCapture(video); return; }
+      animationRef.current = requestAnimationFrame(detectFace); return;
+    }
+
     ctx.save(); ctx.scale(-1, 1); ctx.translate(-canvas.width, 0);
 
     try {
@@ -522,9 +569,42 @@ const PDMeasurement = () => {
         }
       }
 
-      const dist = distanceStatus(irisD, canvas.width);
-      const status = dist !== 'ok' ? dist : !poseOk ? 'pose' : lq.luma < MIN_LUMA ? 'dark' : 'good';
+      // Udaljenost u milimetrima (MediaPipe × korekcija po klasi uređaja), ne u pikselima kadra
+      const dEst = Number.isFinite(pose?.distanceMm) ? estimateFaceDistance(pose.distanceMm, IS_MOBILE) : NaN;
+      const dist = distanceStatusMm(dEst, irisD);
+      const faceStatusNow = dist !== 'ok' ? dist : !poseOk ? 'pose' : lq.luma < MIN_LUMA ? 'dark' : 'good';
+
+      // Kartica uživo: 2× u sekundi, na slici pola rezolucije — da li je na čelu iznad obrva i prislonjena
+      const cl = cardLiveRef.current, now = performance.now();
+      if (faceStatusNow === 'good') {
+        if (!cl.goodSince) cl.goodSince = now;
+        if (now - cl.t > CARD_CHECK_MS) {
+          cl.t = now;
+          try {
+            const hw = canvas.width >> 1, hh = canvas.height >> 1;
+            const hc = halfCanvasRef.current || (halfCanvasRef.current = document.createElement('canvas'));
+            hc.width = hw; hc.height = hh;
+            const hctx = hc.getContext('2d', { willReadFrequently: true });
+            hctx.drawImage(video, 0, 0, hw, hh);
+            const det = detectCardEdges({
+              gray: toGray(hctx.getImageData(0, 0, hw, hh).data, hw, hh), width: hw, height: hh,
+              pupils: [{ x: lX / 2, y: lY / 2 }, { x: rX / 2, y: rY / 2 }],
+            });
+            const full = det && { ...det, widthPx: det.widthPx * 2, markers: det.markers.map(m => ({ x: m.x * 2, y: m.y * 2 })) };
+            const ev = evaluateCard({
+              det: full, minConfidence: CARD_DETECT_MIN_CONFIDENCE, pupils: [{ x: lX, y: lY }, { x: rX, y: rY }],
+              frameH: canvas.height, vfovDeg: vfovFor(canvas.width, canvas.height), dFaceMm: dEst,
+            });
+            cl.status = ev.status;
+            if (debug) { cl.log.push({ status: ev.status, above: ev.above, ratio: ev.ratio, conf: det?.confidence }); if (cl.log.length > 40) cl.log.shift(); }
+          } catch (e) { cl.status = 'missing'; }
+        }
+      } else cl.goodSince = null;
+      // Snimak čeka dobro postavljenu karticu najviše CARD_WAIT_MS, pa se snima i bez nje (ručne oznake)
+      const cardBlocks = faceStatusNow === 'good' && cl.status !== 'ok' && cl.goodSince && now - cl.goodSince < CARD_WAIT_MS;
+      const status = cardBlocks ? `card-${cl.status}` : faceStatusNow;
       setFaceStatus(status);
+      drawCardGuide(ctx, { x: lX, y: lY }, { x: rX, y: rY }, cl.status === 'ok');
 
       const hist = faceHistoryRef.current;
       hist.push({
@@ -545,7 +625,7 @@ const PDMeasurement = () => {
           setLiveDbg({
             fps: tick.since ? tick.frames * 1000 / (now - tick.since) : 0,
             w: canvas.width, h: canvas.height, ipdPx: irisD, ipdPct: irisD / canvas.width * 100,
-            yaw: pose?.yawDeg, pitch: pose?.pitchDeg, dMm: pose?.distanceMm, status,
+            yaw: pose?.yawDeg, pitch: pose?.pitchDeg, dMm: pose?.distanceMm, dEst, status, card: cl.status,
             luma: lq.luma, sharp: lq.sharp,
           });
           tick.frames = 0; tick.since = now;
@@ -558,30 +638,18 @@ const PDMeasurement = () => {
         setCountdown(Math.max(0, Math.ceil((COUNTDOWN_MS - elapsed) / 1000)));
 
         if (elapsed >= COUNTDOWN_MS) {
-          cancelAnimationFrame(animationRef.current); ctx.restore();
+          ctx.restore();
           // Median pozicija zenica kroz 25 frejmova mirovanja — manji jitter landmarka
           const mLX = median(hist.map(h => h.lX)), mLY = median(hist.map(h => h.lY));
           const mRX = median(hist.map(h => h.rX)), mRY = median(hist.map(h => h.rY));
           const dSamples = hist.map(h => h.distanceMm).filter(Number.isFinite);
           captureDistanceRef.current = dSamples.length ? median(dSamples) : null;
-
           const vW = video.videoWidth, vH = video.videoHeight;
-          const ta = 3 / 4;
-          let srcX, srcY, srcW, srcH;
-          if (vW / vH > ta) { srcH = vH; srcW = vH * ta; srcX = (vW - srcW) / 2; srcY = 0; }
-          else               { srcW = vW; srcH = vW / ta; srcX = 0; srcY = (vH - srcH) / 2; }
-          const snap = document.createElement('canvas');
-          snap.width = srcW; snap.height = srcH;
-          const sc = snap.getContext('2d');
-          sc.save(); sc.scale(-1, 1); sc.translate(-snap.width, 0);
-          sc.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, snap.width, snap.height);
-          sc.restore();
-          setSnapshotUrl(snap.toDataURL('image/jpeg', 0.92));
           if (debug) {
             const fin = (k) => hist.map(h => h[k]).filter(Number.isFinite);
             captureMetaRef.current = {
               videoW: vW, videoH: vH,
-              crop: { x: Math.round(srcX), y: Math.round(srcY), w: Math.round(srcW), h: Math.round(srcH) },
+              crop: { x: 0, y: 0, w: vW, h: vH },
               frames: hist.length,
               yawDeg: fin('yawDeg').length ? Number(median(fin('yawDeg')).toFixed(1)) : null,
               pitchDeg: fin('pitchDeg').length ? Number(median(fin('pitchDeg')).toFixed(1)) : null,
@@ -589,38 +657,52 @@ const PDMeasurement = () => {
               irisDiameterPx: [median(fin('irisL')), median(fin('irisR'))],
               luma: Number.isFinite(lq.luma) ? Math.round(lq.luma) : null,
               sharpness: Number.isFinite(lq.sharp) ? Math.round(lq.sharp) : null,
+              cardLive: cardLiveRef.current.log.slice(-6),
             };
           }
-          // Kamera se gasi čim je slika uhvaćena (privatnost + baterija)
-          video.srcObject?.getTracks().forEach(t => t.stop());
-          video.srcObject = null;
-          setCameraReady(false);
-          // Zenice u px snimka (snimak je ogledalski okrenut); leva na ekranu prva
-          const prefill = [
-            { x: (vW - mLX) - srcX, y: mLY - srcY },
-            { x: (vW - mRX) - srcX, y: mRY - srcY },
-          ].sort((a, b) => a.x - b.x);
-          prefillPupilsRef.current = prefill;
-          setSnapSize({ w: srcW, h: srcH });
-          setPupilMarkers(prefill);
-          captureFrameRef.current = { vW, vH };
-          // B1: automatska detekcija ivica kartice na punoj rezoluciji; ispod praga pouzdanosti → procena iz zenica
-          let det = null;
-          try {
-            const img = sc.getImageData(0, 0, snap.width, snap.height);
-            det = detectCardEdges({ gray: toGray(img.data, snap.width, snap.height), width: snap.width, height: snap.height, pupils: prefill });
-          } catch (e) { console.warn('Detekcija kartice:', e); }
-          const autoOk = !!det && det.confidence >= CARD_DETECT_MIN_CONFIDENCE;
-          cardDetectRef.current = det ? { ...det, used: autoOk } : { used: false };
-          setCardAuto(autoOk);
-          setCardMarkers(autoOk ? det.markers : cardPrefill(prefill, srcW, srcH));
-          setZoomed(true);
-          setCountdown(null); setStep('adjust'); return;
+          // Ceo kadar (bez isecanja na 3:4); zenice u px snimka (ogledalski), leva na ekranu prva
+          const prefill = [{ x: vW - mLX, y: mLY }, { x: vW - mRX, y: mRY }].sort((p, q) => p.x - q.x);
+          burstRef.current = { frames: [grabMirrored(video)], prefill, vW, vH };
+          animationRef.current = requestAnimationFrame(detectFace); return;
         }
       } else { cntdwnStartRef.current = null; setCountdown(null); }
     } catch (e) { console.error('Detection error:', e); }
     ctx.restore(); animationRef.current = requestAnimationFrame(detectFace);
-  }, [faceMesh, debug]);
+  }, [faceMesh, debug]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Kraj rafala: kartica se detektuje na svakom frejmu; medijana širine ako se frejmovi slažu (≤2%)
+  function finalizeCapture(video) {
+    const { frames, prefill, vW, vH } = burstRef.current;
+    burstRef.current = null;
+    const results = frames.map((c) => {
+      try {
+        const img = c.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, c.width, c.height);
+        return detectCardEdges({ gray: toGray(img.data, c.width, c.height), width: c.width, height: c.height, pupils: prefill });
+      } catch { return null; }
+    });
+    const agg = aggregateBurst(results, CARD_DETECT_MIN_CONFIDENCE);
+    const idx = agg ? agg.index : frames.length - 1;
+    const det = results[idx];
+    const autoOk = !!agg && agg.agree;
+    setSnapshotUrl(frames[idx].toDataURL('image/jpeg', 0.92));
+    // Kamera se gasi čim je slika uhvaćena (privatnost + baterija)
+    video.srcObject?.getTracks().forEach(t => t.stop());
+    video.srcObject = null;
+    setCameraReady(false);
+    prefillPupilsRef.current = prefill;
+    setSnapSize({ w: vW, h: vH });
+    setPupilMarkers(prefill);
+    captureFrameRef.current = { vW, vH };
+    cardDetectRef.current = det ? { ...det, used: autoOk } : { used: false };
+    if (debug && captureMetaRef.current) {
+      captureMetaRef.current.burst = results.map(r => (r ? { w: Number(r.widthPx.toFixed(1)), conf: Number(r.confidence.toFixed(2)) } : null));
+      captureMetaRef.current.burstSpread = agg ? Number((agg.spread * 100).toFixed(2)) : null;
+    }
+    setCardAuto(autoOk);
+    setCardMarkers(autoOk ? det.markers : cardPrefill(prefill, vW, vH));
+    setZoomed(true);
+    setCountdown(null); setStep('adjust');
+  }
 
   useEffect(() => {
     if (cameraReady && faceMesh && step === 'detecting') { lastTimeRef.current = -1; detectFace(); }
@@ -661,9 +743,7 @@ const PDMeasurement = () => {
     );
     // B4: udaljenost iz poznate širine kartice (FOV po klasi uređaja); MediaPipe samo kao rezerva
     const frame = captureFrameRef.current;
-    const mobile = navigator.userAgentData?.mobile ?? /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-    const vfovDeg = parseVfovOverride(window.location.search)
-      ?? (frame ? vfovPrior({ mobile, frameW: frame.vW, frameH: frame.vH }) : NaN);
+    const vfovDeg = frame ? vfovFor(frame.vW, frame.vH) : NaN;
     const distanceCardMm = frame ? distanceFromCard({ cardPx, frameH: frame.vH, vfovDeg, cardPosition }) : NaN;
     const useCard = Number.isFinite(distanceCardMm);
     const distanceMm = useCard ? distanceCardMm : captureDistanceRef.current;
@@ -801,11 +881,13 @@ const PDMeasurement = () => {
     faceHistoryRef.current = []; cntdwnStartRef.current = null; lastTimeRef.current = -1;
     captureDistanceRef.current = null; captureFrameRef.current = null; cardDetectRef.current = null; setCardAuto(false);
     captureMetaRef.current = null; prefillPupilsRef.current = null; setReport(null); setLiveDbg(null);
+    burstRef.current = null; cardLiveRef.current = { t: 0, status: 'missing', goodSince: null, log: [] };
   };
   const retryDetect = () => {
     faceHistoryRef.current = []; cntdwnStartRef.current = null; setCountdown(null); lastTimeRef.current = -1;
     captureDistanceRef.current = null; captureFrameRef.current = null; cardDetectRef.current = null; setCardAuto(false);
     captureMetaRef.current = null; prefillPupilsRef.current = null; setReport(null); setLiveDbg(null);
+    burstRef.current = null; cardLiveRef.current = { t: 0, status: 'missing', goodSince: null, log: [] };
     voice.stop();
     setSnapshotUrl(null); setStep('detecting'); startCamera();
   };
@@ -1055,6 +1137,11 @@ const PDMeasurement = () => {
                 ↻ Ispravite glavu, pogled pravo u kameru
               </div>
             )}
+            {faceStatus.startsWith('card-') && (
+              <div style={{ display: 'flex', padding: '9px 10px', borderRadius: 8, background: '#664700', color: '#ffd94d', fontWeight: 500 }}>
+                ▭ {faceStatus === 'card-missing' ? 'Ne vidim karticu' : faceStatus === 'card-high' ? 'Kartica je previsoko' : 'Prislonite karticu uz čelo'}
+              </div>
+            )}
             {faceStatus === 'dark' && (
               <div style={{ display: 'flex', padding: '9px 10px', borderRadius: 8, background: '#664700', color: '#ffd94d', fontWeight: 500 }}>
                 ☀ Premalo svetla
@@ -1093,6 +1180,7 @@ const PDMeasurement = () => {
                 : faceStatus === 'close' ? 'Odmaknite se malo'
                 : faceStatus === 'pose' ? 'Ispravite glavu, pogled pravo u kameru'
                 : faceStatus === 'dark' ? 'Premalo svetla — okrenite se ka svetlu'
+                : faceStatus.startsWith('card-') ? 'Kartica na čelu, iznad obrva'
                 : countdown !== null ? 'Ostanite mirni...'
                 : 'Odlično! Ostanite mirni'}
             </div>
