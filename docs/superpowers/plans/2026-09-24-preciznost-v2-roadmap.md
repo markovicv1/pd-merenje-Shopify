@@ -216,3 +216,17 @@ Stari Android (Android 10, „camera 0, facing back", 1440×1080), testerka rani
 - Udaljenost: po kartici sa priorom 50° → 357 mm (rezultat 65,0). Tester: ~55 cm → vertikalni FOV ≈ 33,5°.
   Prior zadnje kamere promenjen na rearLandscape 33,5° / rearPortrait 44° → ista slika daje 64,0.
   Jedna tačka i procena (ne metar) — potvrditi merenjem metrom i na iPhone-u.
+
+### Android tablet (Android 10, 1440×1080), testerka PD ≈ 63 (2026-09-25)
+
+| Kamera | Udaljenost (metar) | Po kartici | Kartica px | Zenice px | Sirovi | Rezultat | Greška |
+|---|---|---|---|---|---|---|---|
+| prednja | — | 312 mm (55°) | 290,2 | 207,6 | 61,24 | 64,5 | +1,5 |
+| zadnja | 650 mm | 564 mm (33,5°) | 275,5 | 192,6 | 59,86 | 61,5 | −1,5 |
+| zadnja | 600 mm | 538 mm (33,5°) | 288,8 | 200,7 | 59,48 | 61,5 | −1,5 |
+
+- FOV zadnje kamere tableta iz merenja metrom: 29,2° i 30,2° → prior zadnje kamere 30° (portret 39°).
+- Sa tačnom udaljenošću zadnja kamera i dalje daje 61,4 / 61,1 → udaljenost nije uzrok razlike.
+- Sirovi PD je VEĆI izbliza (prednja, ~31 cm) nego izdaleka (zadnja, ~62 cm), a model (paralaksa + vergencija)
+  predviđa suprotno. Razlika ≈ 5 %. Moguće: kartica odmaknuta od čela (kosa, prsti) u snimcima zadnjom kamerom,
+  razlika kamera, ili šum (±1,5 = ~1,4 SD). Test: ista osoba, zadnja kamera na ~40 cm i ~60 cm.
