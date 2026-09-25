@@ -91,3 +91,21 @@ Deljeno sa PD kalkulatorom: MediaPipe inicijalizacija, `headPose.js`, `captureGa
 - Fotografije za anketu (saglasnost) — Marko.
 - Prototipovi v1 su početna procena; menjaju se tek na podacima iz ankete.
 - Stranica za obradu fotografija (featuri) — posle prikupljanja fotografija.
+
+## 8. Privremena kalibracija (2026-09-25)
+
+Prvi test na Markovom licu: featuri daleko od prvobitnih prototipova (npr. `chinToJaw` 0,39 prema 0,50–0,78).
+MediaPipe (legacy FaceMesh, isti raspored tačaka) pokrenut lokalno na 40 frontalnih snimaka testera PD-a (~10 osoba):
+
+| Feature | min | medijana | max | SD |
+|---|---|---|---|---|
+| heightToWidth | 0,92 | 1,14 | 1,33 | 0,087 |
+| foreheadToCheek | 0,82 | 0,87 | 0,93 | 0,021 |
+| jawToCheek | 0,88 | 0,91 | 0,94 | 0,015 |
+| chinToJaw | 0,37 | 0,39 | 0,42 | 0,013 |
+| jawAngleDeg | 124 | 136 | 141 | 3,6 |
+
+Prototipovi su preslikani na ovu raspodelu (relativni odnosi među oblicima zadržani, sigma = SD populacije).
+Raspodela rezultata na istim snimcima: ovalno 27, trouglasto 7, duguljasto 3, okruglo 2, dijamantsko 1 (od 40);
+ista osoba na 10 snimaka dosledno dobija isti oblik. Konačna kalibracija — iz ankete.
+Napomena: na snimcima PD testera kartica je na čelu, što može pomeriti tačke čela.

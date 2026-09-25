@@ -193,6 +193,10 @@ export default function FaceShape() {
         try { ctx.drawImage(v, 0, 0, W, H); } catch { /* ostaje prazno */ }
         stopCamera();
         if (s.lastLm) drawOutline(ctx, s.lastLm, W, H, top.oblik, { dashed: false, pulse: 1 });
+        if (debug && s.lastLm) {
+          ctx.fillStyle = '#ffe14d';
+          for (const i of Object.values(FACE_SHAPE_LANDMARKS)) { ctx.beginPath(); ctx.arc(s.lastLm[i].x * W, s.lastLm[i].y * H, 6, 0, Math.PI * 2); ctx.fill(); }
+        }
         setResult({ top, ranking, features });
         setCaption(`Vaš oblik lica: ${pct(top)}`);
         setPhase('result');

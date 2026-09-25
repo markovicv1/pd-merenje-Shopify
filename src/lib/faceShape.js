@@ -49,20 +49,25 @@ export function extractFeatures(points) {
   };
 }
 
-// Prototipovi 7 oblika (početni priori iz optičarskih opisa; podešavaju se anketom)
+// Prototipovi 7 oblika — PRIVREMENA kalibracija (2026-09-25).
+// MediaPipe mesh je izglađen: na pravim licima featuri variraju u uskom opsegu (npr. jawToCheek 0,88–0,94),
+// daleko od prvobitnih „optičarskih" vrednosti (0,72–0,96), pa bi skoro sva lica bila okrugla/ovalna.
+// Zato su prvobitni prototipovi preslikani na raspodelu izmerenu na 40 frontalnih snimaka (~10 osoba, testeri PD-a):
+// za svaki feature — medijana populacije + (odstupanje prototipa od proseka prototipova) / SD prototipova × 1,5 × SD populacije.
+// Sigma = SD populacije. Relativni odnosi među oblicima su zadržani; konačna kalibracija ide iz ankete.
 export const SHAPE_PROTOTYPES = {
-  oval:     { heightToWidth: 1.40, foreheadToCheek: 0.92, jawToCheek: 0.80, chinToJaw: 0.62, jawAngleDeg: 118 },
-  round:    { heightToWidth: 1.20, foreheadToCheek: 0.90, jawToCheek: 0.83, chinToJaw: 0.72, jawAngleDeg: 128 },
-  oblong:   { heightToWidth: 1.62, foreheadToCheek: 0.92, jawToCheek: 0.82, chinToJaw: 0.65, jawAngleDeg: 120 },
-  square:   { heightToWidth: 1.22, foreheadToCheek: 0.94, jawToCheek: 0.94, chinToJaw: 0.75, jawAngleDeg: 100 },
-  heart:    { heightToWidth: 1.38, foreheadToCheek: 0.97, jawToCheek: 0.72, chinToJaw: 0.50, jawAngleDeg: 115 },
-  triangle: { heightToWidth: 1.30, foreheadToCheek: 0.82, jawToCheek: 0.96, chinToJaw: 0.78, jawAngleDeg: 105 },
-  diamond:  { heightToWidth: 1.45, foreheadToCheek: 0.78, jawToCheek: 0.75, chinToJaw: 0.52, jawAngleDeg: 115 },
+  oval:     { heightToWidth: 1.179, foreheadToCheek: 0.888, jawToCheek: 0.900, chinToJaw: 0.384, jawAngleDeg: 138.2 },
+  round:    { heightToWidth: 0.985, foreheadToCheek: 0.878, jawToCheek: 0.908, chinToJaw: 0.402, jawAngleDeg: 144.6 },
+  oblong:   { heightToWidth: 1.393, foreheadToCheek: 0.888, jawToCheek: 0.905, chinToJaw: 0.389, jawAngleDeg: 139.5 },
+  square:   { heightToWidth: 1.005, foreheadToCheek: 0.898, jawToCheek: 0.937, chinToJaw: 0.408, jawAngleDeg: 126.7 },
+  heart:    { heightToWidth: 1.160, foreheadToCheek: 0.913, jawToCheek: 0.879, chinToJaw: 0.362, jawAngleDeg: 136.3 },
+  triangle: { heightToWidth: 1.082, foreheadToCheek: 0.837, jawToCheek: 0.942, chinToJaw: 0.413, jawAngleDeg: 129.9 },
+  diamond:  { heightToWidth: 1.228, foreheadToCheek: 0.816, jawToCheek: 0.886, chinToJaw: 0.365, jawAngleDeg: 136.3 },
 };
 
-// Tolerancije po featuru (širina gaussiana)
+// Tolerancije po featuru (širina gaussiana) = SD featura na pravim licima
 export const FEATURE_SIGMA = {
-  heightToWidth: 0.12, foreheadToCheek: 0.06, jawToCheek: 0.07, chinToJaw: 0.10, jawAngleDeg: 10,
+  heightToWidth: 0.0867, foreheadToCheek: 0.0214, jawToCheek: 0.0147, chinToJaw: 0.0124, jawAngleDeg: 3.7,
 };
 
 const gauss = (x, mu, sigma) => Math.exp(-0.5 * ((x - mu) / sigma) ** 2);
