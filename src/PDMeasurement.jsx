@@ -132,8 +132,13 @@ const COUNTDOWN_MS    = 3000;
 const BURST_FRAMES    = 3;     // rafal pri snimku: kartica se detektuje na svakom, uzima se medijana
 const CARD_CHECK_MS   = 500;   // provera kartice uživo (2× u sekundi, na slici pola rezolucije)
 const CARD_WAIT_MS    = 6000;  // najduže čekanje na dobro postavljenu karticu, pa se snima i bez nje
-const IS_MOBILE = typeof navigator !== 'undefined'
-  && (navigator.userAgentData?.mobile ?? /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent));
+// Telefon/tablet i kada je u browseru uključen „prikaz za računar" (tada UA izgleda kao desktop):
+// dodatno gledamo dodirni ekran bez miša (pointer: coarse).
+const IS_MOBILE = typeof navigator !== 'undefined' && (
+  navigator.userAgentData?.mobile
+  || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+  || (navigator.maxTouchPoints > 1 && typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches)
+);
 const vfovFor = (frameW, frameH, rear = false) =>
   parseVfovOverride(window.location.search) ?? vfovPrior({ mobile: IS_MOBILE, frameW, frameH, rear });
 
