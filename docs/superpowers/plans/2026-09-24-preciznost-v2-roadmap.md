@@ -209,8 +209,10 @@ Napomena: pupilometar meri refleks rožnjače, kamera centar zenice/šarenice �
 
 ## Asistirani režim (zadnja kamera) — prvi test (2026-09-25)
 
-Stari Android (Android 10, „camera 0, facing back", 1440×1080), osoba sa referentnim PD 66 (oftalmolog, analogno).
-- Rezultat **65,0** (−1,0 mm). Kartica B1 conf 0,71, rafal 0,56 %, oznake nepomerane.
+Stari Android (Android 10, „camera 0, facing back", 1440×1080), testerka ranije snimana prednjom kamerom Androida
+(referentni PD nije poznat).
+- Kartica B1 conf 0,71, rafal 0,56 %, oznake nepomerane; sirovi PD 62,06.
 - Mirovanje: jitter zenica 13,5 px (≈ 6,6 % IPD) — stari uslov (3 % IPD) bi blokirao; novi (razmera + brzina) je prošao.
-- Udaljenost: po kartici (FOV prior 50°) 357 mm; tester procenio „oko 65 cm". Ako je stvarno 650 mm, FOV bi bio ≈ 28,5°
-  i rezultat 63,5 (dalje od reference). FOV zadnje kamere ostaje nekalibrisan — potrebno merenje udaljenosti metrom.
+- Udaljenost: po kartici sa priorom 50° → 357 mm (rezultat 65,0). Tester: ~55 cm → vertikalni FOV ≈ 33,5°.
+  Prior zadnje kamere promenjen na rearLandscape 33,5° / rearPortrait 44° → ista slika daje 64,0.
+  Jedna tačka i procena (ne metar) — potvrditi merenjem metrom i na iPhone-u.

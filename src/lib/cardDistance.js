@@ -7,8 +7,10 @@ import { CARD_WIDTH_MM, CARD_DEPTH_OFFSET_MM } from './pdMath.js';
 // Telefon u portretu: vertikala je duža strana senzora prednje kamere (~23–26 mm ekv.).
 // Desktop/laptop: vertikala je kraća strana senzora (i kad Chrome iseče portret, visina ostaje cela).
 // Kalibracija: EMEET C960 2K ≈ 44–45° (merenja 2026-09-24).
-// Zadnja (glavna) kamera telefona: ~26 mm ekv. → uža od prednje. Nije kalibrisano na testerima (asistirani režim).
-export const VFOV_PRIOR = { phonePortrait: 70, phoneLandscape: 55, desktop: 45, rearPortrait: 64, rearLandscape: 50 };
+// Zadnja (glavna) kamera telefona (asistirani režim): Chrome daje 1440×1080 isečen iz 16:9 režima senzora → uska vertikala.
+// Kalibracija: stari Android 10, „camera 0, facing back", kartica 282,2 px, udaljenost ~55 cm (procena testera, ne metar)
+// → vertikalni FOV ≈ 33,5° (2026-09-25). Samo jedna tačka — potvrditi merenjem metrom i na iPhone-u.
+export const VFOV_PRIOR = { phonePortrait: 70, phoneLandscape: 55, desktop: 45, rearPortrait: 44, rearLandscape: 33.5 };
 
 export function vfovPrior({ mobile, frameW, frameH, rear = false }) {
   if (mobile && rear) return frameH >= frameW ? VFOV_PRIOR.rearPortrait : VFOV_PRIOR.rearLandscape;
