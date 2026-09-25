@@ -8,7 +8,7 @@ import { detectCardEdges, toGray, CARD_DETECT_MIN_CONFIDENCE } from './lib/cardD
 import { distanceFromCard, vfovPrior, parseVfovOverride } from './lib/cardDistance.js';
 import { estimateFaceDistance, distanceStatusMm, evaluateCard, aggregateBurst, DIST_BLOCK_MAX_MS, DIST_MAX_MM, DIST_MAX_ASSISTED_MM } from './lib/cardCheck.js';
 import { meanLuma, laplacianVariance, eyeForeheadRoi, MIN_LUMA } from './lib/captureGate.js';
-import { createVoice, STATUS_PROMPT, STATUS_HOLD_MS } from './lib/voice.js';
+import { createVoice, STATUS_PROMPT, STATUS_PROMPT_ASSISTED, STATUS_HOLD_MS } from './lib/voice.js';
 import { sfx, unlockSfx, vibrate } from './lib/sfx.js';
 import { loadSettings, saveSettings } from './lib/a11ySettings.js';
 import AdjustView from './components/AdjustView.jsx';
@@ -905,7 +905,7 @@ const PDMeasurement = () => {
   const startMeasurement = (m) => {
     modeRef.current = m; setMode(m);
     unlockSfx(); voice.stop();
-    voice.enqueue(m === 'assisted' ? ['P01', 'P02', 'G02', 'G03'] : ['G01', 'G02', 'G03', 'G04']);
+    voice.enqueue(m === 'assisted' ? ['P01', 'P02', 'G02', 'G03', 'G03A'] : ['G01', 'G02', 'G03', 'G03A', 'G04']);
     startCamera(m); setStep('detecting');
   };
   // Prelazak između prednje i zadnje kamere usred merenja (npr. telefon teško stabilizovati)
@@ -933,11 +933,11 @@ const PDMeasurement = () => {
   // Status detekcije se izgovara tek kad traje STATUS_HOLD_MS (bez „treperenja" poruka)
   useEffect(() => {
     if (step !== 'detecting' || !cameraReady || countdown !== null) return;
-    const id = STATUS_PROMPT[faceDetected ? faceStatus : 'none'];
+    const id = (mode === 'assisted' ? STATUS_PROMPT_ASSISTED : STATUS_PROMPT)[faceDetected ? faceStatus : 'none'];
     if (!id) return;
     const t = setTimeout(() => voice.say(id), STATUS_HOLD_MS);
     return () => clearTimeout(t);
-  }, [step, cameraReady, faceDetected, faceStatus, countdown, voice]);
+  }, [step, cameraReady, faceDetected, faceStatus, countdown, voice, mode]);
 
   // Odbrojavanje: glas (G14 „Tri. Dva. Jedan. Snimljeno!") ili pisak; uvek i vibracija
   const prevCountdownRef = useRef(null);
@@ -1097,7 +1097,7 @@ const PDMeasurement = () => {
                       <IcoCardGraphic />
                     </div>
                   </BlueCell>
-                  <span>Kartica (kreditna, lična karta ili zdravstvena) na čelu, iznad obrva. Skinite naočare i sočiva u boji.</span>
+                  <span>Kartica (kreditna, lična karta ili zdravstvena) na čelu, iznad obrva. Držite je za gornju ivicu. Skinite naočare i sočiva u boji.</span>
                 </div>
 
                 {/* Row 2: gledajte u kameru */}
@@ -1213,8 +1213,8 @@ const PDMeasurement = () => {
             }}>
               <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: faceStatus === 'good' ? '#00b8ff' : '#ff4040', boxShadow: faceStatus === 'good' ? '0 0 6px #00b8ff' : '0 0 6px #ff4040' }} />
               {!faceDetected ? 'Pozicionirajte lice'
-                : faceStatus === 'far' ? 'Priđite kameri'
-                : faceStatus === 'close' ? 'Odmaknite se malo'
+                : faceStatus === 'far' ? (mode === 'assisted' ? 'Približite telefon' : 'Priđite kameri')
+                : faceStatus === 'close' ? (mode === 'assisted' ? 'Udaljite telefon' : 'Odmaknite se malo')
                 : faceStatus === 'pose' ? 'Ispravite glavu, pogled pravo u kameru'
                 : faceStatus === 'dark' ? 'Premalo svetla — okrenite se ka svetlu'
                 : faceStatus.startsWith('card-') ? 'Kartica na čelu, iznad obrva'

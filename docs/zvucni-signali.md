@@ -25,6 +25,7 @@
 | G01 | `G01_pocetak` | klik na „Započni merenje" | Merenje počinje. Držite telefon u visini očiju, oko pola metra od lica. |
 | G02 | `G02_naocare_sociva` | posle G01 | Skinite naočare i sočiva u boji. Obična providna sočiva možete ostaviti. |
 | G03 | `G03_kartica_celo` | posle G02 | Prislonite karticu ravno na čelo, iznad obrva. |
+| G03A | `G03A_gornja_ivica` | posle G03 | Držite je za gornju ivicu. **(novo 2026-09-25 — snimiti; zasad samo titl)** |
 | G04 | `G04_gledajte_kameru` | posle G03 | Gledajte pravo u kameru. |
 
 ## 2. Vođenje tokom detekcije
@@ -37,7 +38,7 @@ Puštaju se kada stanje traje ≥ 1 s; ista poruka se ne ponavlja pre 4 s. Prior
 | G06 | `G06_pridjite` | predaleko | Priđite bliže. |
 | G07 | `G07_odmaknite` | preblizu | Odmaknite se malo. |
 | G08 | `G08_ispravite_glavu` | glava nije frontalno | Ispravite glavu i gledajte pravo u kameru. |
-| G09 | `G09_kartica_nije_vidljiva` | kartica nije detektovana (Faza B) | Ne vidim karticu. Prislonite je na čelo, iznad obrva. |
+| G09 | `G09_kartica_nije_vidljiva` | kartica nije detektovana (Faza B) | Ne vidim karticu. Prislonite je na čelo, iznad obrva, i držite je za gornju ivicu. |
 | G10 | `G10_kartica_nagnuta` | kartica nagnuta (Faza B) | Kartica je nagnuta. Prislonite je ravno na čelo, iznad obrva. **(novi tekst — snimiti ponovo)** |
 | G11 | `G11_premalo_svetla` | slika pretamna | Premalo je svetla. Okrenite se ka prozoru ili lampi. |
 | G12 | `G12_slika_mutna` | slika mutna | Slika je mutna. Mirujte ili se malo odmaknite. |
@@ -123,8 +124,8 @@ Primljeno i obrađeno u `public/audio/` (AAC `.m4a`, mono, 48 kHz, 96 kbps; tiš
 i 0,25 s na kraju; glasnoća govora izjednačena na −19 dBFS RMS, vrh ≤ −1 dBFS):
 G01–G08, G10–G14, G18–G23 (19 fajlova).
 
-**Nedostaje:** G09 („Ne vidim karticu. Prislonite je na čelo, iznad obrva.") — potreban za proveru kartice uživo.
+**Nedostaje:** G09 („Ne vidim karticu. Prislonite je na čelo, iznad obrva, i držite je za gornju ivicu."), G03A („Držite je za gornju ivicu.") — potreban za proveru kartice uživo.
 **Snimiti ponovo:** G10 — tekst usklađen sa standardnim uputstvom „kartica na čelu, iznad obrva" (2026-09-25).
-**Prioritet za asistirani režim (zadnja kamera):** P01, P02 — već se prikazuju kao titl.
-**Sledeće serije:** G24–G28, P03–P05, N40–N80, N_IPO.
+**Prioritet za asistirani režim (zadnja kamera):** P01–P04 — već se prikazuju kao titl.
+**Sledeće serije:** G24–G28, P05, N40–N80, N_IPO.
 Originali ostaju kod Marka (master); u repozitorijumu su samo obrađene verzije.
