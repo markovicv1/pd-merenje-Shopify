@@ -9,6 +9,9 @@ import { distanceFromCard, vfovPrior, parseVfovOverride } from './lib/cardDistan
 import { estimateFaceDistance, distanceStatusMm, evaluateCard, aggregateBurst, DIST_BLOCK_MAX_MS, DIST_MAX_MM, DIST_MAX_ASSISTED_MM } from './lib/cardCheck.js';
 import { meanLuma, laplacianVariance, eyeForeheadRoi, MIN_LUMA, stillness } from './lib/captureGate.js';
 import { createVoice, STATUS_PROMPT, STATUS_PROMPT_ASSISTED, STATUS_HOLD_MS } from './lib/voice.js';
+
+// Glasovne poruke koje opisuju trenutno stanje — na ekranu kamere ih već prikazuje veliki okvir stanja
+const STATUS_IDS = new Set([...Object.values(STATUS_PROMPT), ...Object.values(STATUS_PROMPT_ASSISTED)]);
 import { sfx, unlockSfx, vibrate } from './lib/sfx.js';
 import { loadSettings, saveSettings } from './lib/a11ySettings.js';
 import AdjustView from './components/AdjustView.jsx';
@@ -143,22 +146,22 @@ const vfovFor = (frameW, frameH, rear = false) =>
   parseVfovOverride(window.location.search) ?? vfovPrior({ mobile: IS_MOBILE, frameW, frameH, rear });
 
 // Očekivani položaj kartice (za obris na ekranu): na čelu, iznad obrva
-function drawCardGuide(ctx, l, r, ok) {
+function drawCardGuide(ctx, l, r, ok, k = 1) {
   const [p0, p1] = l.x <= r.x ? [l, r] : [r, l];
   const ipd = Math.hypot(p1.x - p0.x, p1.y - p0.y); if (!(ipd > 0)) return;
   const ang = Math.atan2(p1.y - p0.y, p1.x - p0.x);
   const w = ipd * 85.6 / 63, h = w * 53.98 / 85.6, up = 0.75 * ipd;
   const cx = (p0.x + p1.x) / 2 + Math.sin(ang) * up, cy = (p0.y + p1.y) / 2 - Math.cos(ang) * up;
   ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang);
-  ctx.strokeStyle = ok ? '#4ade80' : 'rgba(255,255,255,0.8)'; ctx.lineWidth = 3;
-  ctx.setLineDash(ok ? [] : [10, 8]);
+  ctx.setLineDash(ok ? [] : [10 * k, 8 * k]);
   const rr = w * 0.037;
   ctx.beginPath();
   ctx.moveTo(-w / 2 + rr, -h / 2); ctx.lineTo(w / 2 - rr, -h / 2); ctx.arcTo(w / 2, -h / 2, w / 2, -h / 2 + rr, rr);
   ctx.lineTo(w / 2, h / 2 - rr); ctx.arcTo(w / 2, h / 2, w / 2 - rr, h / 2, rr);
   ctx.lineTo(-w / 2 + rr, h / 2); ctx.arcTo(-w / 2, h / 2, -w / 2, h / 2 - rr, rr);
   ctx.lineTo(-w / 2, -h / 2 + rr); ctx.arcTo(-w / 2, -h / 2, -w / 2 + rr, -h / 2, rr);
-  ctx.stroke(); ctx.restore();
+  ctx.strokeStyle = 'rgba(0,0,0,0.75)'; ctx.lineWidth = 6 * k; ctx.stroke();
+  ctx.strokeStyle = ok ? '#4ade80' : '#ffffff'; ctx.lineWidth = 3 * k; ctx.stroke(); ctx.restore();
 }
 
 // Frejm kamere u punoj rezoluciji; prednja kamera ogledalski (kao što ga korisnik vidi), zadnja ne
@@ -198,7 +201,7 @@ const GLOBAL_CSS = `
     display: flex; align-items: center; justify-content: center;
     width: 100%; background: transparent; color: #fff;
     font-size: 16px; font-weight: 500; line-height: 1.5;
-    padding: 15px 23px; border-radius: 100px; border: 2px solid #4d4d4d;
+    padding: 15px 23px; border-radius: 100px; border: 2px solid #8a94a8;
     touch-action: manipulation; transition: filter 0.15s;
   }
   .btn-secondary:hover { filter: brightness(1.2); }
@@ -212,9 +215,12 @@ const GLOBAL_CSS = `
 
   video { width: 100%; height: 100%; object-fit: cover; display: block; transform: scaleX(-1); }
   video.rear { transform: none; }
-  canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+  canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
 
-  button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid #00b8ff; outline-offset: 2px; }
+  button:focus-visible, select:focus-visible, input:focus-visible { outline: 3px solid #00b8ff; outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+  }
 
   .pd-adjust-hint { position: absolute; top: 22%; left: 50%; transform: translateX(-50%); text-align: center; max-width: 84%; color: #fff; pointer-events: none; opacity: 0.85; text-shadow: 0 2px 8px rgba(0,0,0,0.7), 0 0 16px rgba(0,0,0,0.4); z-index: 6; transition: opacity 0.4s ease-out, visibility 0s linear 0.4s; }
   .pd-adjust-hint.is-hidden { opacity: 0; visibility: hidden; }
@@ -233,7 +239,7 @@ const GLOBAL_CSS = `
 const MAX_W = 420;
 
 // ── Shared header component ───────────────────────────────────────────────
-const Header = ({ onA11y }) => (
+const Header = ({ onA11y, full = false }) => (
   <div style={{ background: '#121724', flexShrink: 0 }}>
     <header style={{
       display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
@@ -244,23 +250,23 @@ const Header = ({ onA11y }) => (
         <IcoHeaderLogo />
         <div style={{ marginTop: 3, display: 'flex', flexDirection: 'column' }}>
           <span style={{ color: '#fff', fontSize: 15, fontWeight: 600, marginLeft: -1, marginTop: -3 }}>PD Kalkulator</span>
-          <span style={{ color: '#8c8c8c', fontSize: 11, fontWeight: 400, marginLeft: -1 }}>Optičarka.com</span>
+          <span style={{ color: '#b3b3b3', fontSize: 13, fontWeight: 400, marginLeft: -1 }}>Optičarka.com</span>
         </div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <button type="button" onClick={onA11y} aria-label="Pristupačnost" title="Pristupačnost" style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36,
-          borderRadius: '50%', color: '#fff', border: '1px solid #404d66',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44,
+          borderRadius: '50%', color: '#fff', border: '2px solid #8a94a8',
         }}>
-          <IcoAccessibility size={22} />
+          <IcoAccessibility size={26} />
         </button>
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-          background: '#00b8ff', color: '#111', fontSize: 12, fontWeight: 600,
-          padding: '8px 16px', borderRadius: 100,
+          background: '#00b8ff', color: '#111', fontSize: 14, fontWeight: 700,
+          padding: full ? '10px 16px' : '10px 14px', borderRadius: 100,
         }}>
           <IcoAiBadge />
-          <span>AI Powered</span>
+          <span>{full ? 'AI Powered' : 'AI'}</span>
         </div>
       </div>
     </header>
@@ -342,7 +348,7 @@ const DebugPanel = ({ report, phantom, onImage, onImageRaw }) => {
       <div style={{ fontWeight: 700, marginBottom: 6 }}>DEBUG{report.mode === 'fantom' ? ' · FANTOM' : ''}</div>
       {rows.map(([k, v]) => (
         <div key={k} style={{ display: 'flex', gap: 8 }}>
-          <span style={{ color: '#8c8c8c', minWidth: 110 }}>{k}</span><span>{v}</span>
+          <span style={{ color: '#b3b3b3', minWidth: 110 }}>{k}</span><span>{v}</span>
         </div>
       ))}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8, alignItems: 'center' }}>
@@ -552,15 +558,15 @@ const PDMeasurement = () => {
       const rX = rIris.x * canvas.width, rY = rIris.y * canvas.height;
       const irisD = Math.abs(rX - lX);
 
-      ctx.strokeStyle = '#00b8ff'; ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.arc(lX, lY, 18, 0, Math.PI * 2); ctx.stroke();
-      ctx.beginPath(); ctx.arc(rX, rY, 18, 0, Math.PI * 2); ctx.stroke();
-      ctx.fillStyle = '#00b8ff';
-      ctx.beginPath(); ctx.arc(lX, lY, 5, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(rX, rY, 5, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.5; ctx.setLineDash([6, 6]);
-      ctx.beginPath(); ctx.moveTo(lX, lY); ctx.lineTo(rX, rY); ctx.stroke();
-      ctx.setLineDash([]);
+      // Debljine u pikselima EKRANA (k = px kamere po CSS px), sa tamnim oreolom — vidljivo i bez naočara
+      const k = canvas.clientWidth ? 1 / Math.max(canvas.clientWidth / canvas.width, canvas.clientHeight / canvas.height) : 1;
+      const ringR = Math.max(0.12 * irisD, 10 * k);
+      for (const [x, y] of [[lX, lY], [rX, rY]]) {
+        ctx.beginPath(); ctx.arc(x, y, ringR, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(0,0,0,0.75)'; ctx.lineWidth = 6 * k; ctx.stroke();
+        ctx.strokeStyle = '#00b8ff'; ctx.lineWidth = 3 * k; ctx.stroke();
+        ctx.beginPath(); ctx.arc(x, y, 2.5 * k, 0, Math.PI * 2); ctx.fillStyle = '#00b8ff'; ctx.fill();
+      }
 
       const matrixData = results.facialTransformationMatrixes?.[0]?.data;
       const pose = matrixData ? decomposeFacialMatrix(matrixData) : null;
@@ -627,7 +633,7 @@ const PDMeasurement = () => {
       const cardBlocks = faceStatusNow === 'good' && cl.status !== 'ok' && cl.goodSince && now - cl.goodSince < CARD_WAIT_MS;
       const status = cardBlocks ? `card-${cl.status}` : faceStatusNow;
       setFaceStatus(status);
-      drawCardGuide(ctx, { x: lX, y: lY }, { x: rX, y: rY }, cl.status === 'ok');
+      drawCardGuide(ctx, { x: lX, y: lY }, { x: rX, y: rY }, cl.status === 'ok', k);
 
       const hist = faceHistoryRef.current;
       hist.push({
@@ -1020,9 +1026,29 @@ const PDMeasurement = () => {
     if (step === 'adjust' && prev === 'detecting') {
       if (!(settings.countdown === 'voice' && settings.voice)) play('shutter');
       buzz([80]);
-      voice.enqueue(['G21']);
+      voice.enqueue(['G29', 'G21']);
     }
   }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Stanje na ekranu kamere: boja + znak + tekst (ne samo boja)
+  const statusView = (() => {
+    const WARN = '#ffd94d', OK = '#4ade80';
+    const warn = (text) => ({ color: WARN, icon: '⚠', text });
+    if (!cameraReady) return { color: '#8a94a8', icon: '…', text: 'Pokrećem kameru…' };
+    if (countdown !== null) return { color: OK, icon: '✓', text: 'Mirujte — snimam' };
+    if (!faceDetected) return warn('Postavite lice u okvir');
+    switch (faceStatus) {
+      case 'far': return warn(mode === 'assisted' ? 'Približite telefon' : 'Priđite bliže');
+      case 'close': return warn(mode === 'assisted' ? 'Udaljite telefon' : 'Odmaknite se malo');
+      case 'pose': return warn('Ispravite glavu, gledajte pravo u kameru');
+      case 'dark': return warn('Premalo svetla — okrenite se ka svetlu');
+      case 'card-missing': return warn('Ne vidim karticu — na čelo, iznad obrva');
+      case 'card-high': return warn('Kartica je previsoko — spustite je iznad obrva');
+      case 'card-off-face': return warn('Prislonite karticu uz čelo');
+      case 'good': return { color: OK, icon: '✓', text: 'Odlično — mirujte' };
+      default: return warn('Postavite lice u okvir');
+    }
+  })();
 
   const a11yPanel = (
     <AccessibilityPanel open={a11yOpen} onClose={() => setA11yOpen(false)}
@@ -1040,15 +1066,18 @@ const PDMeasurement = () => {
         {/* Error banner (npr. vrednost van opsega) */}
         {error && (
           <div style={{ background: 'rgba(200,40,40,0.15)', borderBottom: '1px solid rgba(200,40,40,0.3)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexShrink: 0 }}>
-            <span style={{ color: '#ff8080', fontSize: 14 }}>{error}</span>
-            <button onClick={() => setError(null)} style={{ color: 'rgba(255,255,255,0.5)', fontSize: 18, padding: '0 4px' }}>✕</button>
+            <span role="alert" style={{ color: '#ffb3b3', fontSize: 17, fontWeight: 600, lineHeight: 1.35 }}>⚠ {error}</span>
+            <button onClick={() => setError(null)} aria-label="Zatvori poruku" style={{ color: '#fff', fontSize: 22, width: 44, height: 44, flexShrink: 0 }}>✕</button>
           </div>
         )}
 
         <Header onA11y={() => setA11yOpen(true)} />
 
         {/* Legenda + uvećano/ceo snimak */}
-        <div style={{ maxWidth: MAX_W, width: '100%', alignSelf: 'center', padding: '8px 16px 6px', display: 'flex', alignItems: 'center', gap: 14, fontSize: 12, color: '#8c8c8c', flexShrink: 0 }}>
+        <p style={{ maxWidth: MAX_W, width: '100%', alignSelf: 'center', padding: '10px 16px 0', fontSize: settings.largeText ? 20 : 17, fontWeight: 600, lineHeight: 1.35 }}>
+          Crvene zagrade na levu i desnu ivicu kartice. Plavi krugovi na centar zenica.
+        </p>
+        <div style={{ maxWidth: MAX_W, width: '100%', alignSelf: 'center', padding: '8px 16px 6px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 14, fontSize: 15, color: '#d0d4dc', flexShrink: 0 }}>
           <span><span style={{ color: '#FF6B6B', fontWeight: 700 }}>[ ]</span> ivice kartice</span>
           <span><span style={{ color: '#00b8ff' }}>◎</span> zenice</span>
           {mode === 'assisted' && (
@@ -1056,7 +1085,7 @@ const PDMeasurement = () => {
               Snimak {shotsRef.current.length + 1} od {shotsNeeded(shotsRef.current.map(x => x.pd))}
             </span>
           )}
-          <button type="button" onClick={() => setZoomed(z => !z)} style={{ marginLeft: 'auto', color: '#00b8ff', fontSize: 12, fontWeight: 600, padding: '4px 0' }}>
+          <button type="button" onClick={() => setZoomed(z => !z)} style={{ marginLeft: 'auto', color: '#00b8ff', fontSize: 15, fontWeight: 700, padding: '10px 0', minHeight: 44 }}>
             {zoomed ? 'Ceo snimak' : 'Uvećaj'}
           </button>
         </div>
@@ -1100,18 +1129,18 @@ const PDMeasurement = () => {
   // ── INTRO, LOADING, DETECTING, RESULT ─────────────────────────────────
   // ══════════════════════════════════════════════════════════════════════
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: step === 'result' ? '#111' : '#171f2e', fontFamily: 'Inter, sans-serif', color: '#fff' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: '#171f2e', fontFamily: 'Inter, sans-serif', color: '#fff', zoom: settings.largeText && (step === 'intro' || step === 'result') ? 1.2 : undefined }}>
       <style>{GLOBAL_CSS}</style>
 
       {/* Error banner */}
       {error && (
         <div style={{ background: 'rgba(200,40,40,0.15)', borderBottom: '1px solid rgba(200,40,40,0.3)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexShrink: 0 }}>
-          <span style={{ color: '#ff8080', fontSize: 14 }}>{error}</span>
-          <button onClick={() => setError(null)} style={{ color: 'rgba(255,255,255,0.5)', fontSize: 18, padding: '0 4px' }}>✕</button>
+          <span role="alert" style={{ color: '#ffb3b3', fontSize: 17, fontWeight: 600, lineHeight: 1.35 }}>⚠ {error}</span>
+          <button onClick={() => setError(null)} aria-label="Zatvori poruku" style={{ color: '#fff', fontSize: 22, width: 44, height: 44, flexShrink: 0 }}>✕</button>
         </div>
       )}
 
-      <Header onA11y={() => setA11yOpen(true)} />
+      <Header onA11y={() => setA11yOpen(true)} full={step === 'intro'} />
 
       {/* All screen content constrained to MAX_W */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', maxWidth: MAX_W, margin: '0 auto', alignSelf: 'center' }}>
@@ -1122,7 +1151,7 @@ const PDMeasurement = () => {
           <div className="loading-spinner" />
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontWeight: 600, marginBottom: 6 }}>Učitavanje AI modela</div>
-            <div style={{ fontSize: 13, color: '#8c8c8c' }}>{loadingStatus || 'Molimo sačekajte...'}</div>
+            <div style={{ fontSize: 16, color: '#d0d4dc' }}>{loadingStatus || 'Molimo sačekajte...'}</div>
           </div>
         </div>
       )}
@@ -1142,7 +1171,7 @@ const PDMeasurement = () => {
                   <span style={{ color: '#fff' }}>Izmerite </span>
                   <span style={{ color: '#00b8ff' }}>PD</span>
                 </div>
-                <p style={{ color: '#8c8c8c', fontSize: 14, fontWeight: 400, lineHeight: 1.43, alignSelf: 'stretch', textAlign: 'center' }}>Pupilarna distanca za 30 sekundi</p>
+                <p style={{ color: '#b3b3b3', fontSize: 14, fontWeight: 400, lineHeight: 1.43, alignSelf: 'stretch', textAlign: 'center' }}>Pupilarna distanca za 30 sekundi</p>
               </div>
             </div>
 
@@ -1202,10 +1231,13 @@ const PDMeasurement = () => {
                   Uz pomoć druge osobe (zadnja kamera)
                 </button>
               )}
+              <button type="button" onClick={() => setA11yOpen(true)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, minHeight: 44, marginTop: -16, color: '#fff', fontSize: 16, fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: 4 }}>
+                <IcoAccessibility size={24} /> Pristupačnost i saveti
+              </button>
             </div>
 
             {/* Footer */}
-            <p style={{ width: 256, alignSelf: 'center', color: '#66738c', fontSize: 12, fontWeight: 700, lineHeight: 1.5, textAlign: 'center' }}>
+            <p style={{ width: 300, alignSelf: 'center', color: '#c3c9d5', fontSize: 14, fontWeight: 700, lineHeight: 1.5, textAlign: 'center' }}>
               <span style={{ fontWeight: 400 }}>Oznake možete fino pomerati strelicama; lupa se pojavljuje pri prevlačenju<br /></span>
               Merenje se dešava u vašem browseru, svi podaci ostaju na vašem uređaju
             </p>
@@ -1217,85 +1249,42 @@ const PDMeasurement = () => {
       {step === 'detecting' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontWeight: 500 }}>
 
-          {/* Warning badges */}
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, fontSize: 12, minHeight: 32, padding: '0 4px' }}>
-            {faceStatus === 'far' && (
-              <div style={{ display: 'flex', justifyContent: 'center', padding: '9px 10px', borderRadius: 8, background: '#664700', color: '#ffd94d', fontWeight: 500 }}>
-                ↔ Priđite kameri
-              </div>
-            )}
-            {faceStatus === 'close' && (
-              <div style={{ display: 'flex', padding: '9px 10px', borderRadius: 8, background: '#661414', color: '#f66', fontWeight: 500 }}>
-                ↔ Odmaknite se malo
-              </div>
-            )}
-            {faceStatus === 'pose' && (
-              <div style={{ display: 'flex', padding: '9px 10px', borderRadius: 8, background: '#664700', color: '#ffd94d', fontWeight: 500 }}>
-                ↻ Ispravite glavu, pogled pravo u kameru
-              </div>
-            )}
-            {faceStatus.startsWith('card-') && (
-              <div style={{ display: 'flex', padding: '9px 10px', borderRadius: 8, background: '#664700', color: '#ffd94d', fontWeight: 500 }}>
-                ▭ {faceStatus === 'card-missing' ? 'Ne vidim karticu' : faceStatus === 'card-high' ? 'Kartica je previsoko' : 'Prislonite karticu uz čelo'}
-              </div>
-            )}
-            {faceStatus === 'dark' && (
-              <div style={{ display: 'flex', padding: '9px 10px', borderRadius: 8, background: '#664700', color: '#ffd94d', fontWeight: 500 }}>
-                ☀ Premalo svetla
-              </div>
-            )}
-          </div>
-
-          {/* Camera — full width, 3:4 */}
+          {/* Kamera — debeo okvir u boji stanja (vidljiv i bez naočara): žuto = ispravite, zeleno = mirujte */}
           <div style={{ position: 'relative', width: '100%', aspectRatio: '3/4', overflow: 'hidden', background: '#050508', borderRadius: 20 }}>
             {/* Face guide oval */}
             <div style={{
               position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -52%)',
               width: '65%', height: '75%', borderRadius: '50%',
-              border: `3px dashed ${faceStatus === 'good' ? '#00b8ff' : 'rgba(255,255,255,0.25)'}`,
+              border: faceStatus === 'good' ? '4px solid #4ade80' : '4px dashed rgba(255,255,255,0.85)',
+              filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.9))',
               pointerEvents: 'none', zIndex: 9, transition: 'border-color 0.3s',
             }} />
             {countdown !== null && (
-              <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', fontSize: 96, fontWeight: 900, color: '#00b8ff', zIndex: 20, textShadow: '0 0 40px rgba(0,184,255,0.9)', lineHeight: 1 }}>
+              <div aria-hidden="true" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', fontSize: 120, fontWeight: 900, color: '#fff', zIndex: 20, textShadow: '0 0 6px #000, 0 0 16px #000, 0 0 40px rgba(0,184,255,0.9)', lineHeight: 1 }}>
                 {countdown === 0 ? '📸' : countdown}
               </div>
             )}
             <video ref={videoRef} playsInline muted className={mode === 'assisted' ? 'rear' : undefined} />
             <canvas ref={canvasRef} />
             {debug && <DebugOverlay live={liveDbg} camera={cameraInfoRef.current} delegate={delegateRef.current} phantom={phantom} />}
-
-            {/* Status bar — inside camera, bottom */}
-            <div style={{
-              position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)',
-              display: 'flex', alignItems: 'center', gap: 8, zIndex: 10,
-              background: 'rgba(0,0,0,0.6)', padding: '6px 16px', borderRadius: 20,
-              color: '#fff', fontSize: 13, whiteSpace: 'nowrap',
-            }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: faceStatus === 'good' ? '#00b8ff' : '#ff4040', boxShadow: faceStatus === 'good' ? '0 0 6px #00b8ff' : '0 0 6px #ff4040' }} />
-              {!faceDetected ? 'Pozicionirajte lice'
-                : faceStatus === 'far' ? (mode === 'assisted' ? 'Približite telefon' : 'Priđite kameri')
-                : faceStatus === 'close' ? (mode === 'assisted' ? 'Udaljite telefon' : 'Odmaknite se malo')
-                : faceStatus === 'pose' ? 'Ispravite glavu, pogled pravo u kameru'
-                : faceStatus === 'dark' ? 'Premalo svetla — okrenite se ka svetlu'
-                : faceStatus.startsWith('card-') ? 'Kartica na čelu, iznad obrva'
-                : countdown !== null ? 'Ostanite mirni...'
-                : 'Odlično! Ostanite mirni'}
-            </div>
-
-            {/* Face not detected badge — inside camera */}
-            {!faceDetected && cameraReady && (
-              <div style={{
-                position: 'absolute', bottom: 52, left: '50%', transform: 'translateX(-50%)',
-                background: 'rgba(89,20,20,0.9)', color: '#ff8080',
-                fontSize: 13, fontWeight: 500, padding: '7px 16px', borderRadius: 20,
-                zIndex: 10, whiteSpace: 'nowrap',
-              }}>
-                ✕&nbsp; Lice nije detektovano
-              </div>
+            {cameraReady && (
+              <div aria-hidden="true" style={{ position: 'absolute', inset: 0, borderRadius: 20, border: `8px solid ${statusView.color}`, pointerEvents: 'none', zIndex: 12, transition: 'border-color 0.3s' }} />
             )}
           </div>
 
-          <Caption caption={caption} large={settings.largeText} />
+          {/* Jedno mesto za poruku: šta treba uraditi SADA (veliko), ispod uputstvo iz glasovnog vođenja */}
+          <div role="status" aria-live="polite" style={{
+            display: 'flex', alignItems: 'center', gap: 12, background: '#000', border: `3px solid ${statusView.color}`,
+            borderRadius: 14, padding: '12px 16px', minHeight: 76,
+          }}>
+            <span aria-hidden="true" style={{ fontSize: 30, fontWeight: 900, color: statusView.color, lineHeight: 1, flexShrink: 0 }}>{statusView.icon}</span>
+            <span style={{ fontSize: settings.largeText ? 30 : 24, fontWeight: 700, lineHeight: 1.25 }}>{statusView.text}</span>
+          </div>
+          {caption && !STATUS_IDS.has(caption.id) && (
+            <p aria-live="polite" style={{ fontSize: settings.largeText ? 23 : 19, fontWeight: 600, lineHeight: 1.35, textAlign: 'center', padding: '0 8px' }}>
+              {caption.text}
+            </p>
+          )}
 
           {IS_MOBILE && (
             <button className="btn-secondary" onClick={() => switchMode(mode === 'assisted' ? 'self' : 'assisted')} style={{ marginTop: 4 }}>
@@ -1319,26 +1308,26 @@ const PDMeasurement = () => {
           <div style={{ width: 'min(320px, 100%)', marginLeft: 10, display: 'flex', flexDirection: 'column', gap: 28 }}>
 
             {/* Done icon + label */}
-            <div style={{ width: 113, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24, alignSelf: 'center', fontSize: 13, fontWeight: 500, color: '#999' }}>
+            <div style={{ width: 113, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24, alignSelf: 'center', fontSize: 16, fontWeight: 600, color: '#d0d4dc' }}>
               <IcoDone />
               <span>Merenje završeno</span>
             </div>
 
             {/* PD card */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, textAlign: 'center', background: '#222', padding: '31px 23px', border: '1px solid rgba(0,184,255,0.2)', borderRadius: 20, color: '#999' }}>
-              <p style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.455, letterSpacing: '1.09px', textTransform: 'uppercase' }}>Vaše PD rastojanje</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, textAlign: 'center', background: '#1f293d', padding: '31px 23px', border: '2px solid #6b7894', borderRadius: 20, color: '#d0d4dc' }}>
+              <p style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.4, letterSpacing: '0.8px', textTransform: 'uppercase' }}>Vaše PD rastojanje</p>
               <div style={{ width: 165, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', alignSelf: 'center' }}>
                 <span style={{ color: '#00b8ff', fontSize: Number.isInteger(finalPD) ? 80 : 64, fontWeight: 700, lineHeight: 1.1 }}>{formatPd(finalPD)}</span>
-                <span style={{ color: '#666', fontSize: 28, fontWeight: 600, lineHeight: 3.143 }}>mm</span>
+                <span style={{ color: '#d0d4dc', fontSize: 28, fontWeight: 600, lineHeight: 3.143 }}>mm</span>
               </div>
-              <p style={{ fontSize: 13, fontWeight: 400 }}>Normalan opseg: 48–80 mm</p>
+              <p style={{ fontSize: 15, fontWeight: 400 }}>Normalan opseg: 48–80 mm</p>
             </div>
 
             {/* Out of range warning */}
             {finalPD != null && (finalPD < 48 || finalPD > 80) && (
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, background: 'rgba(255,153,0,0.1)', padding: '13px 30px 13px 15px', border: '1px solid rgba(255,153,0,0.4)', borderRadius: 12 }}>
                 <span style={{ color: '#ffd94d', fontSize: 18 }}>⚠️</span>
-                <p style={{ flexGrow: 1, color: '#ffb24d', fontSize: 13, lineHeight: 1.385 }}>
+                <p style={{ flexGrow: 1, color: '#ffc46b', fontSize: 16, fontWeight: 600, lineHeight: 1.4 }}>
                   Rezultat van opsega 48–80 mm. Pokušajte ponovo ili posetite optičara.
                 </p>
               </div>
@@ -1348,14 +1337,14 @@ const PDMeasurement = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: 16, lineHeight: 1.5 }}>
               {sentToParent ? (
                 <>
-                  <p style={{ fontSize: 13, color: '#8c8c8c', textAlign: 'center' }}>
+                  <p style={{ fontSize: 16, color: '#e6e9ef', textAlign: 'center', lineHeight: 1.4 }}>
                     Vrednost {formatPd(finalPD)} mm je upisana u vaš recept u konfiguratoru.
                   </p>
                   <button className="btn-secondary" onClick={() => { setSentToParent(false); reset(); }}>Izmeri ponovo</button>
                 </>
               ) : showManualCopy ? (
                 <>
-                  <p style={{ fontSize: 13, color: '#8c8c8c', textAlign: 'center' }}>
+                  <p style={{ fontSize: 16, color: '#e6e9ef', textAlign: 'center', lineHeight: 1.4 }}>
                     {copyOk
                       ? 'Vrednost je kopirana u clipboard. Zatvorite ovaj tab i nalepite je gde je potrebno.'
                       : `Zabeležite vrednost: ${formatPd(finalPD)} mm — unesite je ručno.`}
@@ -1375,7 +1364,7 @@ const PDMeasurement = () => {
 
           {debug && <DebugPanel report={report} phantom={phantom} onImage={snapshotUrl ? () => downloadAnnotated(true) : null} onImageRaw={snapshotUrl ? () => downloadAnnotated(false) : null} />}
 
-          <p style={{ marginTop: 60, alignSelf: 'stretch', fontSize: 10, fontWeight: 600, lineHeight: 1.6, letterSpacing: '0.79px', textTransform: 'uppercase', textAlign: 'center', color: '#999' }}>
+          <p style={{ marginTop: 60, alignSelf: 'stretch', fontSize: 14, fontWeight: 600, lineHeight: 1.6, letterSpacing: '0.5px', textTransform: 'uppercase', textAlign: 'center', color: '#c3c9d5' }}>
             Brinemo o vašim očima i vašoj privatnosti
           </p>
         </div>

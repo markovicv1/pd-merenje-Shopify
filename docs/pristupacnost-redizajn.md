@@ -1,4 +1,4 @@
-# PD kalkulator — redizajn za pristupačnost (predlog, 2026-09-26)
+# PD kalkulator — redizajn za pristupačnost (sprovedeno 2026-09-26)
 
 > Cilj: ne menjati izgled aplikacije, nego ukloniti greške u pristupačnosti.
 > Polazna tačka: korisnik tokom snimanja **nema naočare** i slabije vidi; glas može biti isključen,

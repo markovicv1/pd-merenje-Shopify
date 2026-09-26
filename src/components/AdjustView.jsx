@@ -19,7 +19,13 @@ const MarkerShape = ({ group, index, size = 44 }) => {
     const dir = index === 0 ? 1 : -1;
     return (
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
-        <g stroke={CARD_COLOR} strokeWidth="2" strokeLinecap="round" fill="none">
+        {/* tamni oreol ispod, da se oznaka vidi na svakoj pozadini */}
+        <g stroke="rgba(0,0,0,0.8)" strokeWidth="5" strokeLinecap="round" fill="none">
+          <line x1={c} y1={4} x2={c} y2={size - 4} />
+          <line x1={c} y1={4} x2={c + dir * 8} y2={4} />
+          <line x1={c} y1={size - 4} x2={c + dir * 8} y2={size - 4} />
+        </g>
+        <g stroke={CARD_COLOR} strokeWidth="2.5" strokeLinecap="round" fill="none">
           <line x1={c} y1={4} x2={c} y2={size - 4} />
           <line x1={c} y1={4} x2={c + dir * 8} y2={4} />
           <line x1={c} y1={size - 4} x2={c + dir * 8} y2={size - 4} />
@@ -30,7 +36,12 @@ const MarkerShape = ({ group, index, size = 44 }) => {
   }
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
-      <g stroke={PUPIL_COLOR} strokeWidth="2" fill="none">
+      <g stroke="rgba(0,0,0,0.8)" strokeWidth="5" fill="none">
+        <circle cx={c} cy={c} r="11" />
+        <line x1={c} y1={c - 17} x2={c} y2={c - 13} /><line x1={c} y1={c + 13} x2={c} y2={c + 17} />
+        <line x1={c - 17} y1={c} x2={c - 13} y2={c} /><line x1={c + 13} y1={c} x2={c + 17} y2={c} />
+      </g>
+      <g stroke={PUPIL_COLOR} strokeWidth="2.5" fill="none">
         <circle cx={c} cy={c} r="11" />
         <line x1={c} y1={c - 17} x2={c} y2={c - 13} /><line x1={c} y1={c + 13} x2={c} y2={c + 17} />
         <line x1={c - 17} y1={c} x2={c - 13} y2={c} /><line x1={c + 13} y1={c} x2={c + 17} y2={c} />
@@ -184,7 +195,7 @@ export default function AdjustView({
 
       {/* Fino pomeranje izabranog markera za 1 piksel snimka */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 16px 0' }}>
-        <span style={{ fontSize: 12, color: '#8c8c8c', flex: 1 }}>
+        <span style={{ fontSize: 15, color: '#d0d4dc', flex: 1 }}>
           Fino: <span style={{ color: selected.group === 'card' ? CARD_COLOR : PUPIL_COLOR }}>{LABELS[selected.group][selected.index]}</span>
         </span>
         <button type="button" aria-label="Pomeri levo" style={nudgeBtn} onClick={() => nudge(-1, 0)} disabled={!sel}>◀</button>

@@ -30,6 +30,8 @@ export const PROMPTS = {
   G18: { file: 'G18_jos_jednom', text: 'Još jedan snimak. Ostanite u istom položaju.' },
   G19: { file: 'G19_poslednji', text: 'Poslednji snimak.' },
   G20: { file: 'G20_snimci_se_razlikuju', text: 'Snimci se razlikuju. Ponovićemo merenje.' },
+  // G29: posle snimka — naočare se mogu vratiti (redizajn za pristupačnost); još nije snimljen
+  G29: { file: null, text: 'Snimak je gotov. Sada možete ponovo da stavite naočare.' },
   G21: { file: 'G21_proverite_oznake', text: 'Proverite oznake na kartici i zenicama, pa potvrdite.' },
   G22: { file: 'G22_rezultat_nemoguc', text: 'Rezultat nije moguć. Proverite oznake i pokušajte ponovo.' },
   G23: { file: 'G23_sociva_u_boji', text: 'Da li nosite sočiva u boji? Ako nosite, skinite ih i ponovite merenje.' },
@@ -55,7 +57,8 @@ export function shouldPlay({ id, now, lastPlayedAt = {}, busy = false, interrupt
 }
 
 // Procena trajanja titla kada se ne pušta zvuk (ili dok se ne zna trajanje snimka).
-export const captionMs = (text) => Math.max(2000, text.length * 70);
+// Titl mora da se stigne pročitati i bez zvuka (slabiji vid, bez naočara): najmanje 4 s, ~12 znakova u sekundi
+export const captionMs = (text) => Math.max(4000, text.length * 83);
 
 // Upravljač zvukom: jedan HTMLAudioElement. Prva poruka se pokreće iz klika „Započni merenje",
 // čime se zvuk otključava (iOS/autoplay pravila) i element ostaje upotrebljiv.
@@ -80,7 +83,7 @@ export function createVoice({ baseUrl, onCaption }) {
     onCaption?.({ id, text: p.text });
     if (enabled && audio && p.file) {
       audio.src = `${baseUrl}${p.file}.m4a`;
-      audio.onended = () => clearCaptionLater(600);
+      audio.onended = () => clearCaptionLater(Math.max(600, captionMs(p.text) - (audio.duration || 0) * 1000));
       clearCaptionLater(captionMs(p.text) + 4000); // osigurač ako onended ne stigne
       audio.play().catch(() => clearCaptionLater(captionMs(p.text)));
     } else {

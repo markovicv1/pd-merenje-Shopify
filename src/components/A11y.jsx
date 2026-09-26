@@ -61,7 +61,7 @@ export function AccessibilityPanel({ open, onClose, settings, onChange, canVibra
     }}>
       <div onClick={e => e.stopPropagation()} style={{
         width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto', background: '#121724',
-        border: '1px solid #404d66', borderRadius: '20px 20px 0 0', padding: '20px 20px 32px',
+        border: '1px solid #6b7894', borderRadius: '20px 20px 0 0', padding: '20px 20px 32px',
         color: '#d9d9d9', fontSize: fs, lineHeight: 1.5,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -69,7 +69,7 @@ export function AccessibilityPanel({ open, onClose, settings, onChange, canVibra
             <IcoAccessibility size={22} /> Pristupačnost
           </h2>
           <button ref={closeRef} type="button" onClick={onClose} aria-label="Zatvori"
-            style={{ fontSize: 22, padding: '4px 10px', color: '#fff' }}>✕</button>
+            style={{ fontSize: 24, width: 44, height: 44, color: '#fff' }}>✕</button>
         </div>
 
         <H>Podešavanja</H>
@@ -78,14 +78,14 @@ export function AccessibilityPanel({ open, onClose, settings, onChange, canVibra
         <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 0' }}>
           <span>Odbrojavanje</span>
           <select value={settings.countdown} onChange={e => set('countdown')(e.target.value)}
-            style={{ background: '#1f293d', color: '#fff', border: '1px solid #404d66', borderRadius: 8, padding: '6px 10px', fontSize: fs }}>
+            style={{ background: '#1f293d', color: '#fff', border: '1px solid #6b7894', borderRadius: 8, padding: '6px 10px', fontSize: fs }}>
             <option value="voice">glasom</option>
             <option value="beep">piskom</option>
           </select>
         </label>
         {canVibrate && <Toggle label="Vibracija" checked={settings.vibration} onChange={set('vibration')} />}
         <Toggle label="Veći tekst" checked={settings.largeText} onChange={set('largeText')} />
-        <p style={{ fontSize: 13, color: '#8c8c8c' }}>Sva uputstva su uvek i ispisana na ekranu, bez obzira na podešavanje zvuka.</p>
+        <p style={{ fontSize: 15, color: '#d0d4dc' }}>Sva uputstva su uvek i ispisana na ekranu, bez obzira na podešavanje zvuka.</p>
 
         <H>Ako slabije vidite</H>
         <Ul items={[

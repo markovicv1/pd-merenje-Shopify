@@ -17,6 +17,7 @@ const RESULT_HOLD_MS = 1200;  // koliko se rezultat vidi pre povratka
 const TIMEOUT_MS = 20000;     // posle ovoga: „Pokušajte ponovo"
 const MAX_PITCH_DEG = 8;      // strože nego za PD: nagib menja odnos visina/širina
 const ACCENT = '#00b8ff';
+const REDUCED_MOTION = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 const PATHS = typeof Path2D !== 'undefined' ? Object.fromEntries(SHAPE_KEYS.map(k => [k, new Path2D(outlinePath(k))])) : {};
 
 const TEXT = {
@@ -45,7 +46,7 @@ async function loadFaceLandmarker() {
 }
 
 // Obris oblika postavljen na lice: centar između vrha čela i brade, skala po visini lica, rotacija po liniji očiju
-function drawOutline(ctx, lm, W, H, key, { dashed, pulse }) {
+function drawOutline(ctx, lm, W, H, key, { dashed, pulse, k = 1 }) {
   const top = lm[FACE_SHAPE_LANDMARKS.foreheadTop], chin = lm[FACE_SHAPE_LANDMARKS.chin];
   const l = lm[LEFT_IRIS], r = lm[RIGHT_IRIS];
   const tx = top.x * W, ty = top.y * H, cx = chin.x * W, cy = chin.y * H;
@@ -58,11 +59,11 @@ function drawOutline(ctx, lm, W, H, key, { dashed, pulse }) {
   ctx.rotate(roll);
   ctx.scale(s, s);
   ctx.translate(-50, -(p.top + p.chin) / 2);
-  ctx.lineWidth = (dashed ? 3 : 5) / s;
-  ctx.setLineDash(dashed ? [10 / s, 8 / s] : []);
-  ctx.strokeStyle = ACCENT;
-  ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 4 / s;
-  ctx.stroke(PATHS[key]);
+  // Debljina u pikselima ekrana (k = px kamere po CSS px) + tamni oreol — vidljivo i bez naočara
+  const w = (dashed ? 4 : 6) * k / s;
+  ctx.setLineDash(dashed ? [12 * k / s, 9 * k / s] : []);
+  ctx.strokeStyle = 'rgba(0,0,0,0.75)'; ctx.lineWidth = w + 3 * k / s; ctx.stroke(PATHS[key]);
+  ctx.strokeStyle = dashed ? ACCENT : '#4ade80'; ctx.lineWidth = w; ctx.stroke(PATHS[key]);
   ctx.restore();
 }
 
@@ -152,6 +153,7 @@ export default function FaceShape() {
       ctx.clearRect(0, 0, W, H);
       const now = performance.now();
       const dt = s.last ? Math.min(now - s.last, 100) : 0; s.last = now;
+      const k = c.clientWidth ? 1 / Math.max(c.clientWidth / W, c.clientHeight / H) : 1;
 
       let status = 'none';
       try {
@@ -172,8 +174,8 @@ export default function FaceShape() {
             s.feats.push(extractFeatures(pointsFromLandmarks(lm, W, H)));
           }
           // Animacija: obrisi se smenjuju; blago „disanje"
-          const k = SHAPE_KEYS[Math.floor(now / CYCLE_MS) % SHAPE_KEYS.length];
-          drawOutline(ctx, lm, W, H, k, { dashed: true, pulse: 1 + 0.02 * Math.sin(now / 180) });
+          const shapeKey = SHAPE_KEYS[Math.floor(now / CYCLE_MS) % SHAPE_KEYS.length];
+          drawOutline(ctx, lm, W, H, shapeKey, { dashed: true, pulse: REDUCED_MOTION ? 1 : 1 + 0.02 * Math.sin(now / 180), k });
           if (debug) {
             ctx.fillStyle = '#ffe14d';
             for (const i of idx) { ctx.beginPath(); ctx.arc(lm[i].x * W, lm[i].y * H, 5, 0, Math.PI * 2); ctx.fill(); }
@@ -192,7 +194,7 @@ export default function FaceShape() {
         ctx.clearRect(0, 0, W, H);
         try { ctx.drawImage(v, 0, 0, W, H); } catch { /* ostaje prazno */ }
         stopCamera();
-        if (s.lastLm) drawOutline(ctx, s.lastLm, W, H, top.oblik, { dashed: false, pulse: 1 });
+        if (s.lastLm) drawOutline(ctx, s.lastLm, W, H, top.oblik, { dashed: false, pulse: 1, k });
         if (debug && s.lastLm) {
           ctx.fillStyle = '#ffe14d';
           for (const i of Object.values(FACE_SHAPE_LANDMARKS)) { ctx.beginPath(); ctx.arc(s.lastLm[i].x * W, s.lastLm[i].y * H, 6, 0, Math.PI * 2); ctx.fill(); }
@@ -234,7 +236,7 @@ export default function FaceShape() {
       </div>
 
       <div aria-live="polite" role="status" style={{ minHeight: 64, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px 16px', textAlign: 'center' }}>
-        <span style={{ background: 'rgba(0,0,0,0.85)', borderRadius: 10, padding: '8px 14px', fontSize: phase === 'result' ? 22 : 20, fontWeight: 600 }}>
+        <span style={{ background: 'rgba(0,0,0,0.85)', borderRadius: 10, padding: '8px 14px', fontSize: phase === 'result' ? 26 : 24, fontWeight: 700, lineHeight: 1.3, color: '#fff' }}>
           {err || (phase === 'timeout' ? 'Nismo uspeli da prepoznamo oblik lica. Gledajte pravo u kameru, uz dobro svetlo.' : caption)}
         </span>
       </div>
@@ -242,7 +244,7 @@ export default function FaceShape() {
       {(phase === 'timeout' || (phase === 'result' && !sent && !returnUrl)) && (
         <button className="fs-btn" onClick={retry}>{phase === 'timeout' ? 'Pokušajte ponovo' : 'Ponovi'}</button>
       )}
-      {sent && <p style={{ color: '#8c95a8', fontSize: 14 }}>Rezultat je poslat.</p>}
+      {sent && <p style={{ color: '#d0d4dc', fontSize: 16 }}>Rezultat je poslat.</p>}
 
       {debug && result && (
         <pre style={{ fontSize: 11, color: '#9fb3c8', maxWidth: 480, width: '100%', padding: '8px 16px', whiteSpace: 'pre-wrap' }}>
