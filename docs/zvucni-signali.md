@@ -75,6 +75,7 @@ uskladiti odbrojavanje na ekranu sa snimkom (ili snimiti ponovo u ritmu tačno 1
 | G26 | `G26_upisano` | vrednost poslata u konfigurator | Vrednost je upisana u konfigurator. |
 | G27 | `G27_kopirano` | vrednost kopirana | Vrednost je kopirana. |
 | G28 | `G28_preporuka_opticar` | merenje više puta neuspešno | Preporučujemo merenje kod optičara. |
+| G29 | `G29_naocare_nazad` | posle snimka, pre provere oznaka | Snimak je gotov. Sada možete ponovo da stavite naočare. **(novo — predlog redizajna)** |
 
 ### Brojevi za izgovor rezultata (za slepe i slabovide)
 
