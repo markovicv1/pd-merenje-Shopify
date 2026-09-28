@@ -65,29 +65,8 @@ const IcoEye = ({ variant = 'open', size = 69 }) => {
   );
 };
 
-const IcoCardGraphic = () => (
-  <svg width="20" height="14" viewBox="0 0 20 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect width="20" height="14" rx="1" fill="#D9D9D9"/>
-    <rect y="2.33331" width="20" height="2.33333" fill="black"/>
-    <path d="M2 9.33331H13M2 11.6666H8" stroke="black" strokeLinecap="round"/>
-  </svg>
-);
 
-const IcoFaceGraphic = () => (
-  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="9" cy="9" r="9" fill="#D9D9D9"/>
-    <path d="M8.79999 4.5L6.7611 10.372C6.5355 11.0217 7.01797 11.7 7.70578 11.7H10.8" stroke="black" strokeLinecap="round"/>
-    <circle cx="4.49998" cy="7.2" r="0.9" fill="black"/>
-    <circle cx="13.5" cy="7.2" r="0.9" fill="black"/>
-  </svg>
-);
 
-const IcoPersonGraphic = () => (
-  <svg width="14" height="18" viewBox="0 0 14 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M6.99994 11.385C10.2365 11.3765 12.9885 12.9143 14 16.2248C11.9611 17.511 9.56112 18.0064 6.99994 17.9999C4.43876 18.0064 2.03887 17.511 0 16.2248C1.0127 12.9107 3.75994 11.3765 6.99994 11.385Z" fill="#D9D9D9"/>
-    <path d="M11.3929 4.54597C11.3929 7.05663 9.42614 9.09194 7.00006 9.09194C4.57398 9.09194 2.60731 7.05663 2.60731 4.54597C2.60731 2.0353 4.57398 0 7.00006 0C9.42614 0 11.3929 2.0353 11.3929 4.54597Z" fill="#D9D9D9"/>
-  </svg>
-);
 
 const IcoCameraBtn = () => (
   <svg width="22" height="14" viewBox="0 0 22 14" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -240,6 +219,21 @@ const GLOBAL_CSS = `
 
 const MAX_W = 420;
 
+// Crtež za uvod: lice sa karticom na čelu, prsti drže gornju ivicu
+const IcoCardOnForehead = () => (
+  <svg width="150" height="132" viewBox="0 0 150 132" role="img" aria-label="Kartica ravno na čelu, iznad obrva, držana za gornju ivicu">
+    <ellipse cx="75" cy="76" rx="44" ry="53" fill="#2a3550" stroke="#d0d4dc" strokeWidth="2.5" />
+    <rect x="47" y="34" width="56" height="34" rx="4" fill="#00b8ff" stroke="#fff" strokeWidth="2" />
+    <rect x="47" y="41" width="56" height="7" fill="#0a3a52" />
+    <rect x="53" y="54" width="11" height="8" rx="2" fill="#ffd94d" />
+    <path d="M66 36 q0 -16 7 -16 q6 0 6 14 M80 35 q0 -14 7 -14 q6 0 5 14" fill="#f2c9a5" stroke="#8a5a3c" strokeWidth="1.5" />
+    <path d="M52 76 q8 -5 16 0 M82 76 q8 -5 16 0" stroke="#d0d4dc" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+    <circle cx="60" cy="87" r="4" fill="#d0d4dc" /><circle cx="90" cy="87" r="4" fill="#d0d4dc" />
+    <path d="M75 93 v12 h-5" stroke="#d0d4dc" strokeWidth="2" fill="none" strokeLinecap="round" />
+    <path d="M64 115 q11 6 22 0" stroke="#d0d4dc" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+  </svg>
+);
+
 // ── Shared header component ───────────────────────────────────────────────
 const Header = ({ onA11y, full = false }) => (
   <div style={{ background: '#121724', flexShrink: 0 }}>
@@ -275,15 +269,6 @@ const Header = ({ onA11y, full = false }) => (
   </div>
 );
 
-// ── Blue icon cell (used in checklist) ────────────────────────────────────
-const BlueCell = ({ children, style }) => (
-  <div style={{
-    width: 32, height: 24, background: '#16334c', borderRadius: 3,
-    position: 'relative', flexShrink: 0, ...style,
-  }}>
-    {children}
-  </div>
-);
 
 // ── Debug (?debug=1) ──────────────────────────────────────────────────────
 const DBG_BOX = {
@@ -1218,10 +1203,10 @@ const PDMeasurement = () => {
       {/* ── INTRO ── */}
       {step === 'intro' && !loading && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 48, paddingBottom: 48 }}>
-          <div style={{ width: 'min(320px, calc(100% - 32px))', display: 'flex', flexDirection: 'column', gap: 48, paddingBottom: 8 }}>
+          <div style={{ width: 'min(360px, calc(100% - 32px))', display: 'flex', flexDirection: 'column', gap: 28, paddingBottom: 8 }}>
 
             {/* Top: eye icon + title — 54px below header */}
-            <div style={{ marginTop: 54, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18 }}>
+            <div style={{ marginTop: 36, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18 }}>
               <div style={{ width: 100, background: '#1f293d', padding: '9px 15px 10px 14px', border: '1px solid rgba(0,184,255,0.3)', borderRadius: 16 }}>
                 <IcoEye variant={eyeVariant} size={69} />
               </div>
@@ -1230,76 +1215,74 @@ const PDMeasurement = () => {
                   <span style={{ color: '#fff' }}>Izmerite </span>
                   <span style={{ color: '#00b8ff' }}>PD</span>
                 </div>
-                <p style={{ color: '#b3b3b3', fontSize: 14, fontWeight: 400, lineHeight: 1.43, alignSelf: 'stretch', textAlign: 'center' }}>Pupilarna distanca za 30 sekundi</p>
+                <p style={{ color: '#d0d4dc', fontSize: 16, fontWeight: 400, lineHeight: 1.45, alignSelf: 'stretch', textAlign: 'center' }}>Razmak između zenica, potreban za izradu vaših naočara.</p>
+                <p style={{ marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 14px', borderRadius: 100, background: '#1f293d', border: '1px solid #6b7894', color: '#fff', fontSize: 15, fontWeight: 600 }}>
+                  <span aria-hidden="true">⏱</span> Traje oko 1 minut
+                </p>
               </div>
             </div>
 
-            {/* Checklist card */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 36, background: '#121724', padding: '31px 21px', border: '1px solid #404d66', borderRadius: 24 }}>
-              <div style={{ margin: '0 3px', display: 'flex', flexDirection: 'column', gap: 24, color: '#fff', fontSize: 14, fontWeight: 500, lineHeight: 1.43 }}>
+            {/* 1. Kartica — najvažnija priprema */}
+            <section aria-labelledby="intro-card" style={{ background: '#121724', border: '2px solid #00b8ff', borderRadius: 20, padding: '20px 18px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+              <h2 id="intro-card" style={{ alignSelf: 'stretch', fontSize: 15, fontWeight: 800, letterSpacing: '0.6px', textTransform: 'uppercase', color: '#00b8ff' }}>Pripremite karticu</h2>
+              <IcoCardOnForehead />
+              <p style={{ fontSize: 17, fontWeight: 600, lineHeight: 1.45, color: '#fff' }}>
+                Platna kartica, lična karta ili zdravstvena — sve su iste veličine.
+              </p>
+              <p style={{ fontSize: 16, lineHeight: 1.5, color: '#d0d4dc', alignSelf: 'stretch' }}>
+                Tokom merenja je držite <b style={{ color: '#fff' }}>ravno na čelu, iznad obrva</b>, za <b style={{ color: '#fff' }}>gornju ivicu</b>.
+              </p>
+            </section>
 
-                {/* Row 1: kartica */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, alignSelf: 'stretch' }}>
-                  <BlueCell>
-                    <div style={{ position: 'absolute', top: 5, left: '50%', transform: 'translateX(-50%)' }}>
-                      <IcoCardGraphic />
-                    </div>
-                  </BlueCell>
-                  <span>Kartica (kreditna, lična karta ili zdravstvena) na čelu, iznad obrva. Držite je za gornju ivicu. Skinite naočare i sočiva u boji.</span>
-                </div>
+            {/* Kako teče merenje — koraci sa trajanjem */}
+            <section aria-labelledby="intro-steps" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <h2 id="intro-steps" style={{ fontSize: 15, fontWeight: 800, letterSpacing: '0.6px', textTransform: 'uppercase', color: '#d0d4dc' }}>Kako teče merenje</h2>
+              <ol style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {[
+                  ['Namestite se — aplikacija vas vodi glasom i tekstom', '~20 s'],
+                  ['Mirujte, snimak se pravi sam', '3 s'],
+                  ['Proverite oznake na snimku', '~20 s'],
+                ].map(([t, d], i) => (
+                  <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#1f293d', borderRadius: 12, padding: '12px 14px' }}>
+                    <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: '50%', background: '#00b8ff', color: '#111', fontWeight: 800, fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>
+                    <span style={{ flex: 1, fontSize: 16, lineHeight: 1.4, color: '#fff' }}>{t}</span>
+                    <span style={{ flexShrink: 0, fontSize: 15, fontWeight: 700, color: '#d0d4dc' }}>{d}</span>
+                  </li>
+                ))}
+              </ol>
+            </section>
 
-                {/* Row 2: gledajte u kameru */}
-                <div style={{ marginRight: 51, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, alignSelf: 'stretch' }}>
-                  <BlueCell>
-                    <div style={{ position: 'absolute', top: 3, left: '50%', transform: 'translateX(-50%)' }}>
-                      <IcoFaceGraphic />
-                    </div>
-                  </BlueCell>
-                  <span>Gledajte TAČNO u kameru</span>
-                </div>
+            {/* Pre početka */}
+            <section aria-labelledby="intro-before" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <h2 id="intro-before" style={{ fontSize: 15, fontWeight: 800, letterSpacing: '0.6px', textTransform: 'uppercase', color: '#d0d4dc' }}>Pre početka</h2>
+              <ul style={{ paddingLeft: 22, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 16, lineHeight: 1.45, color: '#fff' }}>
+                <li>Skinite naočare i sočiva u boji</li>
+                <li>Dobro svetlo, lice okrenuto ka njemu</li>
+                <li>Telefon u visini očiju, oko pola metra od lica</li>
+              </ul>
+            </section>
 
-                {/* Row 3: mirujte */}
-                <div style={{ width: 165, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <BlueCell>
-                    <div style={{ position: 'absolute', top: 3, left: '50%', transform: 'translateX(-50%)' }}>
-                      <IcoPersonGraphic />
-                    </div>
-                  </BlueCell>
-                  <span>Mirujte 3 sekunde</span>
-                </div>
-
-                {/* Row 4: označite ivice */}
-                <div style={{ width: 189, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ width: 32, background: '#16334c', padding: '3px 7px 4px 7px', borderRadius: 3, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                    <div style={{ width: 7, height: 7, background: '#d9d9d9', borderRadius: '50%', alignSelf: 'center' }} />
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <div style={{ width: 7, height: 7, background: '#d9d9d9', borderRadius: '50%' }} />
-                      <div style={{ width: 7, height: 7, background: '#d9d9d9', borderRadius: '50%' }} />
-                    </div>
-                  </div>
-                  <span>Označite ivice kartice</span>
-                </div>
-              </div>
-
-              {/* Start button */}
+            {/* Dugmad */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <button className="btn-primary" onClick={() => startMeasurement('self')} disabled={!faceMesh}>
-                {faceMesh ? <><IcoCameraBtn /><span>Započni merenje</span></> : 'Učitavanje...'}
+                {faceMesh ? <><IcoCameraBtn /><span>Imam karticu — započni merenje</span></> : 'Učitavanje...'}
               </button>
               {IS_MOBILE && (
-                <button className="btn-secondary" onClick={() => startMeasurement('assisted')} disabled={!faceMesh} style={{ marginTop: -24 }}>
-                  Uz pomoć druge osobe (zadnja kamera)
+                <button className="btn-secondary" onClick={() => startMeasurement('assisted')} disabled={!faceMesh} style={{ flexDirection: 'column', gap: 2 }}>
+                  <span>Uz pomoć druge osobe (zadnja kamera)</span>
+                  <span style={{ fontSize: 14, color: '#d0d4dc', fontWeight: 400 }}>oko 2 minuta, dva snimka</span>
                 </button>
               )}
-              <button type="button" onClick={() => setA11yOpen(true)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, minHeight: 44, marginTop: -16, color: '#fff', fontSize: 16, fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: 4 }}>
+              <button type="button" onClick={() => setA11yOpen(true)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, minHeight: 44, color: '#fff', fontSize: 16, fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: 4 }}>
                 <IcoAccessibility size={24} /> Pristupačnost i saveti
               </button>
             </div>
 
-            {/* Footer */}
-            <p style={{ width: 300, alignSelf: 'center', color: '#c3c9d5', fontSize: 14, fontWeight: 700, lineHeight: 1.5, textAlign: 'center' }}>
-              <span style={{ fontWeight: 400 }}>Oznake možete fino pomerati strelicama; lupa se pojavljuje pri prevlačenju<br /></span>
-              Merenje se dešava u vašem browseru, svi podaci ostaju na vašem uređaju
-            </p>
+            {/* Poverenje */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, borderTop: '1px solid #6b7894', paddingTop: 18, fontSize: 15, lineHeight: 1.5, color: '#d0d4dc' }}>
+              <p style={{ display: 'flex', gap: 10 }}><span aria-hidden="true">🔒</span><span>Sve se računa na vašem telefonu. Slika se nigde ne šalje, a kamera se gasi odmah posle snimka.</span></p>
+              <p style={{ display: 'flex', gap: 10 }}><span aria-hidden="true">📏</span><span>Kartica ima svuda istu širinu (85,6 mm), pa služi kao lenjir.</span></p>
+            </div>
           </div>
         </div>
       )}
