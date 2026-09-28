@@ -1214,12 +1214,12 @@ const PDMeasurement = () => {
             {/* Priprema: kartica (glavno), naočare, svetlo */}
             <section aria-label="Priprema" style={{ display: 'flex', flexDirection: 'column', borderTop: '1px solid #3a4560', borderBottom: '1px solid #3a4560' }}>
               {[
-                [<IcoLine key="k" d="M3 7h18v10H3zM3 10h18" />, 'Kartica na čelu, iznad obrva', 'Platna, lična ili zdravstvena. Držite je za gornju ivicu.'],
-                [<IcoLine key="n" d="M3 12h4m10 0h4M7 12a3 3 0 1 0 6 0 3 3 0 1 0-6 0m4 0a3 3 0 1 0 6 0 3 3 0 1 0-6 0M3 3l18 18" />, 'Bez naočara i sočiva u boji', 'Providna sočiva možete ostaviti.'],
-                [<IcoLine key="s" d="M12 3v2m0 14v2M3 12h2m14 0h2M5.6 5.6l1.4 1.4m10 10 1.4 1.4M5.6 18.4l1.4-1.4m10-10 1.4-1.4M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" />, 'Dobro svetlo', 'Telefon u visini očiju, oko pola metra od lica.'],
+                ['kartica.svg', 'Kartica na čelu, iznad obrva', 'Platna, lična ili zdravstvena. Držite je za gornju ivicu.'],
+                ['bez-naocara.svg', 'Bez naočara i sočiva u boji', 'Providna sočiva možete ostaviti.'],
+                ['svetlo.svg', 'Dobro svetlo', 'Telefon u visini očiju, oko pola metra od lica.'],
               ].map(([icon, title, sub], i) => (
                 <div key={i} style={{ display: 'flex', gap: 14, alignItems: 'flex-start', padding: '14px 2px', borderTop: i ? '1px solid #2a3450' : 'none' }}>
-                  <span style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 10, background: i === 0 ? '#00b8ff' : '#1f293d', color: i === 0 ? '#0b1220' : '#00b8ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{icon}</span>
+                  <img src={`${import.meta.env.BASE_URL}ikonice/${icon}`} alt="" width={36} height={36} style={{ flexShrink: 0 }} />
                   <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <span style={{ fontSize: 16, fontWeight: 700, color: '#fff', lineHeight: 1.35 }}>{title}</span>
                     <span style={{ fontSize: 14, color: '#c3c9d5', lineHeight: 1.45 }}>{sub}</span>
