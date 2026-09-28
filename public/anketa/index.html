@@ -335,7 +335,9 @@
       <h1>Hvala!</h1>
       <p>Ocenili ste ${done} od ${st.order.length} fotografija. Pošaljite nam odgovore — dugme „Podeli" otvara
          poruke, mejl ili WhatsApp; možete i da kopirate kod i nalepite ga u poruku.</p>
-      ${demo ? '<p class="note">Ovo je probna anketa — kod ne treba slati.</p>' : ''}
+      ${demo ? '<p class="note">Ovo je probna anketa — kod ne treba slati.</p>' : `<p class="note" role="alert" style="font-size:16px;line-height:1.45">
+        <b>⚠ Važno:</b> odgovori se ne šalju automatski. Ako ih ne prosledite osobi koja vas je uključila u testiranje
+        i zatvorite prozor, vaši odgovori neće stići do nas i biće izgubljeni.</p>`}
       <textarea id="code" readonly>${esc(code)}</textarea>
       <div class="row">
         ${navigator.share ? '<button class="btn" id="share">Podeli</button>' : ''}
