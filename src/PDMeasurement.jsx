@@ -219,19 +219,9 @@ const GLOBAL_CSS = `
 
 const MAX_W = 420;
 
-// Crtež za uvod: lice sa karticom na čelu, prsti drže gornju ivicu
-const IcoCardOnForehead = () => (
-  <svg width="150" height="132" viewBox="0 0 150 132" role="img" aria-label="Kartica ravno na čelu, iznad obrva, držana za gornju ivicu">
-    <ellipse cx="75" cy="76" rx="44" ry="53" fill="#2a3550" stroke="#d0d4dc" strokeWidth="2.5" />
-    <rect x="47" y="34" width="56" height="34" rx="4" fill="#00b8ff" stroke="#fff" strokeWidth="2" />
-    <rect x="47" y="41" width="56" height="7" fill="#0a3a52" />
-    <rect x="53" y="54" width="11" height="8" rx="2" fill="#ffd94d" />
-    <path d="M66 36 q0 -16 7 -16 q6 0 6 14 M80 35 q0 -14 7 -14 q6 0 5 14" fill="#f2c9a5" stroke="#8a5a3c" strokeWidth="1.5" />
-    <path d="M52 76 q8 -5 16 0 M82 76 q8 -5 16 0" stroke="#d0d4dc" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-    <circle cx="60" cy="87" r="4" fill="#d0d4dc" /><circle cx="90" cy="87" r="4" fill="#d0d4dc" />
-    <path d="M75 93 v12 h-5" stroke="#d0d4dc" strokeWidth="2" fill="none" strokeLinecap="round" />
-    <path d="M64 115 q11 6 22 0" stroke="#d0d4dc" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-  </svg>
+// Linijska ikonica (stroke) za uvodnu stranu
+const IcoLine = ({ d, size = 20 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>
 );
 
 // ── Shared header component ───────────────────────────────────────────────
@@ -1203,86 +1193,68 @@ const PDMeasurement = () => {
       {/* ── INTRO ── */}
       {step === 'intro' && !loading && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 48, paddingBottom: 48 }}>
-          <div style={{ width: 'min(360px, calc(100% - 32px))', display: 'flex', flexDirection: 'column', gap: 28, paddingBottom: 8 }}>
+          <div style={{ width: 'min(360px, calc(100% - 32px))', display: 'flex', flexDirection: 'column', gap: 24, paddingBottom: 8 }}>
 
-            {/* Top: eye icon + title — 54px below header */}
-            <div style={{ marginTop: 36, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18 }}>
-              <div style={{ width: 100, background: '#1f293d', padding: '9px 15px 10px 14px', border: '1px solid rgba(0,184,255,0.3)', borderRadius: 16 }}>
-                <IcoEye variant={eyeVariant} size={69} />
+            {/* Naslov: oko (animacija), naziv, jedna rečenica i trajanje */}
+            <header style={{ marginTop: 32, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, textAlign: 'center' }}>
+              <div style={{ width: 84, background: '#1f293d', padding: '8px 12px', border: '1px solid rgba(0,184,255,0.3)', borderRadius: 14 }}>
+                <IcoEye variant={eyeVariant} size={58} />
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, alignSelf: 'stretch' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 26, fontWeight: 700, lineHeight: 1.385, letterSpacing: 0.51 }}>
-                  <span style={{ color: '#fff' }}>Izmerite </span>
-                  <span style={{ color: '#00b8ff' }}>PD</span>
+              <h1 style={{ fontSize: 28, fontWeight: 700, letterSpacing: 0.3, lineHeight: 1.2 }}>
+                <span style={{ color: '#fff' }}>Izmerite </span><span style={{ color: '#00b8ff' }}>PD</span>
+              </h1>
+              <p style={{ color: '#d0d4dc', fontSize: 16, lineHeight: 1.45 }}>
+                Razmak između zenica za izradu naočara
+              </p>
+              <p style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#fff', fontSize: 14, fontWeight: 600, letterSpacing: 0.3 }}>
+                <IcoLine d="M12 7v5l3 2M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z" /> Oko 1 minut
+              </p>
+            </header>
+
+            {/* Priprema: kartica (glavno), naočare, svetlo */}
+            <section aria-label="Priprema" style={{ display: 'flex', flexDirection: 'column', borderTop: '1px solid #3a4560', borderBottom: '1px solid #3a4560' }}>
+              {[
+                [<IcoLine key="k" d="M3 7h18v10H3zM3 10h18" />, 'Kartica na čelu, iznad obrva', 'Platna, lična ili zdravstvena. Držite je za gornju ivicu.'],
+                [<IcoLine key="n" d="M3 12h4m10 0h4M7 12a3 3 0 1 0 6 0 3 3 0 1 0-6 0m4 0a3 3 0 1 0 6 0 3 3 0 1 0-6 0M3 3l18 18" />, 'Bez naočara i sočiva u boji', 'Providna sočiva možete ostaviti.'],
+                [<IcoLine key="s" d="M12 3v2m0 14v2M3 12h2m14 0h2M5.6 5.6l1.4 1.4m10 10 1.4 1.4M5.6 18.4l1.4-1.4m10-10 1.4-1.4M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" />, 'Dobro svetlo', 'Telefon u visini očiju, oko pola metra od lica.'],
+              ].map(([icon, title, sub], i) => (
+                <div key={i} style={{ display: 'flex', gap: 14, alignItems: 'flex-start', padding: '14px 2px', borderTop: i ? '1px solid #2a3450' : 'none' }}>
+                  <span style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 10, background: i === 0 ? '#00b8ff' : '#1f293d', color: i === 0 ? '#0b1220' : '#00b8ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{icon}</span>
+                  <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: '#fff', lineHeight: 1.35 }}>{title}</span>
+                    <span style={{ fontSize: 14, color: '#c3c9d5', lineHeight: 1.45 }}>{sub}</span>
+                  </span>
                 </div>
-                <p style={{ color: '#d0d4dc', fontSize: 16, fontWeight: 400, lineHeight: 1.45, alignSelf: 'stretch', textAlign: 'center' }}>Razmak između zenica, potreban za izradu vaših naočara.</p>
-                <p style={{ marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 14px', borderRadius: 100, background: '#1f293d', border: '1px solid #6b7894', color: '#fff', fontSize: 15, fontWeight: 600 }}>
-                  <span aria-hidden="true">⏱</span> Traje oko 1 minut
-                </p>
-              </div>
-            </div>
-
-            {/* 1. Kartica — najvažnija priprema */}
-            <section aria-labelledby="intro-card" style={{ background: '#121724', border: '2px solid #00b8ff', borderRadius: 20, padding: '20px 18px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
-              <h2 id="intro-card" style={{ alignSelf: 'stretch', fontSize: 15, fontWeight: 800, letterSpacing: '0.6px', textTransform: 'uppercase', color: '#00b8ff' }}>Pripremite karticu</h2>
-              <IcoCardOnForehead />
-              <p style={{ fontSize: 17, fontWeight: 600, lineHeight: 1.45, color: '#fff' }}>
-                Platna kartica, lična karta ili zdravstvena — sve su iste veličine.
-              </p>
-              <p style={{ fontSize: 16, lineHeight: 1.5, color: '#d0d4dc', alignSelf: 'stretch' }}>
-                Tokom merenja je držite <b style={{ color: '#fff' }}>ravno na čelu, iznad obrva</b>, za <b style={{ color: '#fff' }}>gornju ivicu</b>.
-              </p>
-            </section>
-
-            {/* Kako teče merenje — koraci sa trajanjem */}
-            <section aria-labelledby="intro-steps" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <h2 id="intro-steps" style={{ fontSize: 15, fontWeight: 800, letterSpacing: '0.6px', textTransform: 'uppercase', color: '#d0d4dc' }}>Kako teče merenje</h2>
-              <ol style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {[
-                  ['Namestite se — aplikacija vas vodi glasom i tekstom', '~20 s'],
-                  ['Mirujte, snimak se pravi sam', '3 s'],
-                  ['Proverite oznake na snimku', '~20 s'],
-                ].map(([t, d], i) => (
-                  <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#1f293d', borderRadius: 12, padding: '12px 14px' }}>
-                    <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: '50%', background: '#00b8ff', color: '#111', fontWeight: 800, fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>
-                    <span style={{ flex: 1, fontSize: 16, lineHeight: 1.4, color: '#fff' }}>{t}</span>
-                    <span style={{ flexShrink: 0, fontSize: 15, fontWeight: 700, color: '#d0d4dc' }}>{d}</span>
-                  </li>
-                ))}
-              </ol>
-            </section>
-
-            {/* Pre početka */}
-            <section aria-labelledby="intro-before" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <h2 id="intro-before" style={{ fontSize: 15, fontWeight: 800, letterSpacing: '0.6px', textTransform: 'uppercase', color: '#d0d4dc' }}>Pre početka</h2>
-              <ul style={{ paddingLeft: 22, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 16, lineHeight: 1.45, color: '#fff' }}>
-                <li>Skinite naočare i sočiva u boji</li>
-                <li>Dobro svetlo, lice okrenuto ka njemu</li>
-                <li>Telefon u visini očiju, oko pola metra od lica</li>
-              </ul>
+              ))}
             </section>
 
             {/* Dugmad */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <button className="btn-primary" onClick={() => startMeasurement('self')} disabled={!faceMesh}>
-                {faceMesh ? <><IcoCameraBtn /><span>Imam karticu — započni merenje</span></> : 'Učitavanje...'}
+                {faceMesh ? <><IcoCameraBtn /><span>Započni merenje</span></> : 'Učitavanje...'}
               </button>
-              {IS_MOBILE && (
-                <button className="btn-secondary" onClick={() => startMeasurement('assisted')} disabled={!faceMesh} style={{ flexDirection: 'column', gap: 2 }}>
-                  <span>Uz pomoć druge osobe (zadnja kamera)</span>
-                  <span style={{ fontSize: 14, color: '#d0d4dc', fontWeight: 400 }}>oko 2 minuta, dva snimka</span>
+              {IS_MOBILE ? (
+                <button className="btn-secondary" onClick={() => startMeasurement('assisted')} disabled={!faceMesh} style={{ flexDirection: 'column', gap: 0, padding: '11px 20px' }}>
+                  <span style={{ fontWeight: 600 }}>Uz pomoć druge osobe</span>
+                  <span style={{ fontSize: 13, color: '#c3c9d5' }}>zadnja kamera · oko 2 minuta</span>
                 </button>
+              ) : (
+                <p style={{ fontSize: 14, color: '#c3c9d5', textAlign: 'center', lineHeight: 1.45 }}>
+                  Merenje uz pomoć druge osobe (zadnjom kamerom) dostupno je na telefonu.
+                </p>
               )}
-              <button type="button" onClick={() => setA11yOpen(true)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, minHeight: 44, color: '#fff', fontSize: 16, fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: 4 }}>
-                <IcoAccessibility size={24} /> Pristupačnost i saveti
-              </button>
             </div>
 
-            {/* Poverenje */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, borderTop: '1px solid #6b7894', paddingTop: 18, fontSize: 15, lineHeight: 1.5, color: '#d0d4dc' }}>
-              <p style={{ display: 'flex', gap: 10 }}><span aria-hidden="true">🔒</span><span>Sve se računa na vašem telefonu. Slika se nigde ne šalje, a kamera se gasi odmah posle snimka.</span></p>
-              <p style={{ display: 'flex', gap: 10 }}><span aria-hidden="true">📏</span><span>Kartica ima svuda istu širinu (85,6 mm), pa služi kao lenjir.</span></p>
-            </div>
+            {/* Poverenje + pristupačnost */}
+            <footer style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, textAlign: 'center' }}>
+              <p style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#c3c9d5', lineHeight: 1.45 }}>
+                <IcoLine d="M6 11V8a6 6 0 0 1 12 0v3M5 11h14v10H5z" size={16} />
+                Obrada na vašem uređaju — slika se nigde ne šalje.
+              </p>
+              <button type="button" onClick={() => setA11yOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 44, color: '#fff', fontSize: 15, fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: 4 }}>
+                <IcoAccessibility size={22} /> Pristupačnost i saveti
+              </button>
+            </footer>
           </div>
         </div>
       )}
