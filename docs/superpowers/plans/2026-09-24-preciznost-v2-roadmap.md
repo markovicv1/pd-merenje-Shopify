@@ -266,3 +266,9 @@ Dopuna (isti tablet i osoba, zadnja kamera, udaljenost metrom):
   a sa 29° je 64,5 (+0,5). Na snimku kartica nije ravno uz čelo (gornja ivica vidno duža od donje — zakrenuta)
   i drži se prstima za bočnu ivicu, pa je širina kartice nepouzdana → snimak se ne koristi za kalibraciju.
   Android prior ostaje 29°; potreban čist snimak (kartica ravno, držana za gornju ivicu, udaljenost metrom).
+- **Ispravka (Samsung):** oznake kartice su ostale na proceni (koja pretpostavlja PD 63) — sirovi PD je tačno 63,00,
+  pa rezultat 64,5 **nije merenje** i izbacuje se iz poređenja. Tester je video prepoznavanje uživo (radi na slici pola
+  rezolucije), a na snimku u punoj rezoluciji prepoznavanje nije uspelo.
+  Ispravke: (1) ako puna rezolucija ne uspe, snimak se proverava i na pola rezolucije, kao uživo;
+  (2) ako kartica ni tada nije prepoznata, prikazuje se upozorenje i „Izračunaj PD" je blokiran dok se oznake kartice
+  ne pomere sa procenjenog mesta; (3) debug: `cardManualMovedPx`, `cardHalfRes`.

@@ -423,7 +423,8 @@ const PDMeasurement = () => {
   const burstRef       = useRef(null);  // { frames, prefill, ... } dok traje rafal pri snimku
   const captureDistanceRef = useRef(null); // udaljenost po MediaPipe-u (mm) — samo rezerva i debug
   const captureFrameRef    = useRef(null); // { vW, vH } frejma kamere pri snimku (za FOV → udaljenost iz kartice)
-  const cardDetectRef      = useRef(null); // rezultat automatske detekcije kartice (B1)
+  const cardDetectRef      = useRef(null);
+  const cardPrefillRef     = useRef(null); // procenjene oznake kartice kad automatsko prepoznavanje ne uspe // rezultat automatske detekcije kartice (B1)
   const [cardAuto, setCardAuto] = useState(false);
 
   // ── Debug režim (?debug=1, &fantom=1) — bez uticaja na ponašanje kad je isključen
@@ -706,11 +707,28 @@ const PDMeasurement = () => {
   function finalizeCapture(video) {
     const { frames, prefill: prefillHist, vW, vH } = burstRef.current;
     burstRef.current = null;
+    // Kartica na punoj rezoluciji; ako ne uspe, isto kao provera uživo — na slici pola rezolucije
+    // (provera uživo je radila, a puna rezolucija nije: sitna tekstura/šum na ivicama)
     const results = frames.map((c) => {
+      let full = null;
       try {
         const img = c.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, c.width, c.height);
-        return detectCardEdges({ gray: toGray(img.data, c.width, c.height), width: c.width, height: c.height, pupils: prefillHist });
-      } catch { return null; }
+        full = detectCardEdges({ gray: toGray(img.data, c.width, c.height), width: c.width, height: c.height, pupils: prefillHist });
+      } catch { full = null; }
+      if (full && full.confidence >= CARD_DETECT_MIN_CONFIDENCE) return full;
+      try {
+        const hw = c.width >> 1, hh = c.height >> 1;
+        const hc = document.createElement('canvas'); hc.width = hw; hc.height = hh;
+        const hctx = hc.getContext('2d', { willReadFrequently: true });
+        hctx.drawImage(c, 0, 0, hw, hh);
+        const half = detectCardEdges({ gray: toGray(hctx.getImageData(0, 0, hw, hh).data, hw, hh), width: hw, height: hh,
+          pupils: prefillHist.map(q => ({ x: q.x / 2, y: q.y / 2 })) });
+        if (half && half.confidence >= CARD_DETECT_MIN_CONFIDENCE) {
+          return { ...half, widthPx: half.widthPx * 2, heightPx: half.heightPx * 2, halfRes: true,
+            markers: half.markers.map(m => ({ x: m.x * 2, y: m.y * 2 })) };
+        }
+      } catch { /* ostaje rezultat pune rezolucije */ }
+      return full;
     });
     const agg = aggregateBurst(results, CARD_DETECT_MIN_CONFIDENCE);
     const idx = agg ? agg.index : frames.length - 1;
@@ -743,7 +761,9 @@ const PDMeasurement = () => {
       captureMetaRef.current.burstSpread = agg ? Number((agg.spread * 100).toFixed(2)) : null;
     }
     setCardAuto(autoOk);
-    setCardMarkers(autoOk ? det.markers : cardPrefill(prefill, vW, vH));
+    const pre = autoOk ? null : cardPrefill(prefill, vW, vH);
+    cardPrefillRef.current = pre;
+    setCardMarkers(autoOk ? det.markers : pre);
     setZoomed(true);
     setCountdown(null); setStep('adjust');
   }
@@ -776,7 +796,17 @@ const PDMeasurement = () => {
   // ── PD calc ────────────────────────────────────────────────────────────
   const formatPd = (v) => v.toLocaleString('sr-RS', { maximumFractionDigits: 1 });
 
+  // Kartica nije prepoznata, a oznake su i dalje na proceni (koja pretpostavlja PD 63) → rezultat bi bio pretpostavka
+  const cardUntouched = !cardAuto && !!cardPrefillRef.current && cardMarkers.length === 2
+    && cardMarkers.every((m, i) => distPx(m, cardPrefillRef.current[i]) < 2);
+
   const calculatePD = () => {
+    if (cardUntouched) { setError('Kartica nije prepoznata automatski. Pomerite obe crvene zagrade na levu i desnu ivicu kartice.'); return; }
+    if (debug && captureMetaRef.current) {
+      captureMetaRef.current.cardManualMovedPx = cardPrefillRef.current
+        ? Number(Math.max(...cardMarkers.map((m, i) => distPx(m, cardPrefillRef.current[i]))).toFixed(1)) : null;
+      captureMetaRef.current.cardHalfRes = !!cardDetectRef.current?.halfRes;
+    }
     // Sve u pikselima izvornog snimka — ne zavisi od veličine ekrana ni od zuma prikaza
     const m = rawPdFromMarkers(cardMarkers, pupilMarkers);
     if (!m) { setError('Postavite markere kartice dalje jedan od drugog.'); return; }
@@ -950,7 +980,7 @@ const PDMeasurement = () => {
     setStep('intro'); setCameraReady(false); setFaceDetected(false); setFaceStatus('none');
     setCountdown(null); setSnapshotUrl(null); setFinalPD(null); setShowManualCopy(false); setCopyOk(false);
     faceHistoryRef.current = []; cntdwnStartRef.current = null; lastTimeRef.current = -1;
-    captureDistanceRef.current = null; captureFrameRef.current = null; cardDetectRef.current = null; setCardAuto(false);
+    captureDistanceRef.current = null; captureFrameRef.current = null; cardDetectRef.current = null; cardPrefillRef.current = null; setCardAuto(false);
     captureMetaRef.current = null; prefillPupilsRef.current = null; setReport(null); setLiveDbg(null);
     burstRef.current = null; distBlockRef.current = null; cardLiveRef.current = { t: 0, status: 'missing', goodSince: null, log: [] };
     shotsRef.current = [];
@@ -977,7 +1007,7 @@ const PDMeasurement = () => {
   // Sledeći snimak u asistiranom režimu (prethodni rezultati ostaju u shotsRef)
   const startNextShot = (promptId) => {
     faceHistoryRef.current = []; cntdwnStartRef.current = null; setCountdown(null); lastTimeRef.current = -1;
-    captureDistanceRef.current = null; captureFrameRef.current = null; cardDetectRef.current = null; setCardAuto(false);
+    captureDistanceRef.current = null; captureFrameRef.current = null; cardDetectRef.current = null; cardPrefillRef.current = null; setCardAuto(false);
     captureMetaRef.current = null; prefillPupilsRef.current = null; setLiveDbg(null);
     burstRef.current = null; distBlockRef.current = null; cardLiveRef.current = { t: 0, status: 'missing', goodSince: null, log: [] };
     voice.stop(); voice.enqueue([promptId]);
@@ -985,7 +1015,7 @@ const PDMeasurement = () => {
   };
   const retryDetect = () => {
     faceHistoryRef.current = []; cntdwnStartRef.current = null; setCountdown(null); lastTimeRef.current = -1;
-    captureDistanceRef.current = null; captureFrameRef.current = null; cardDetectRef.current = null; setCardAuto(false);
+    captureDistanceRef.current = null; captureFrameRef.current = null; cardDetectRef.current = null; cardPrefillRef.current = null; setCardAuto(false);
     captureMetaRef.current = null; prefillPupilsRef.current = null; setReport(null); setLiveDbg(null);
     burstRef.current = null; distBlockRef.current = null; cardLiveRef.current = { t: 0, status: 'missing', goodSince: null, log: [] };
     voice.stop();
@@ -1079,6 +1109,11 @@ const PDMeasurement = () => {
         <p style={{ maxWidth: MAX_W, width: '100%', alignSelf: 'center', padding: '10px 16px 0', fontSize: settings.largeText ? 20 : 17, fontWeight: 600, lineHeight: 1.35 }}>
           Crvene zagrade na levu i desnu ivicu kartice. Plavi krugovi na centar zenica.
         </p>
+        {cardUntouched && (
+          <p role="alert" style={{ maxWidth: MAX_W, width: 'calc(100% - 32px)', alignSelf: 'center', margin: '8px 16px 0', padding: '10px 12px', borderRadius: 10, background: '#3a2f0a', border: '2px solid #ffd94d', color: '#fff', fontSize: settings.largeText ? 19 : 16, fontWeight: 600, lineHeight: 1.35 }}>
+            ⚠ Kartica nije prepoznata automatski. Pomerite obe crvene zagrade tačno na levu i desnu ivicu kartice.
+          </p>
+        )}
         <div style={{ maxWidth: MAX_W, width: '100%', alignSelf: 'center', padding: '8px 16px 6px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 14, fontSize: 15, color: '#d0d4dc', flexShrink: 0 }}>
           <span><span style={{ color: '#FF6B6B', fontWeight: 700 }}>[ ]</span> ivice kartice</span>
           <span><span style={{ color: '#00b8ff' }}>◎</span> zenice</span>
@@ -1119,7 +1154,7 @@ const PDMeasurement = () => {
         {/* Buttons — same max-width */}
         <div style={{ maxWidth: MAX_W, width: '100%', alignSelf: 'center', padding: '12px 16px 28px', display: 'flex', gap: 10, flexShrink: 0 }}>
           <button className="btn-secondary" onClick={retryDetect} style={{ flex: 1 }}>Ponovi</button>
-          <button className="btn-primary" onClick={calculatePD} style={{ flex: 2 }}>Izračunaj PD</button>
+          <button className="btn-primary" onClick={calculatePD} style={{ flex: 2 }} aria-disabled={cardUntouched}>Izračunaj PD</button>
         </div>
         {debug && <DebugPanel report={report} phantom={phantom} onImage={snapshotUrl ? () => downloadAnnotated(true) : null} onImageRaw={snapshotUrl ? () => downloadAnnotated(false) : null} />}
         {a11yPanel}
