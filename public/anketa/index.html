@@ -28,6 +28,17 @@
   .legend .dim { font-size: 15px; color: #c3c9d5; }
   .legend svg { flex: 0 0 40px; }
   .pause { text-align: center; padding-top: 24px; }
+  .cheer { margin: 0 0 10px; padding: 10px 14px; border-radius: 12px; background: #0a3a52; border: 1px solid var(--acc); color: #fff; font-weight: 700; font-size: 16px; text-align: center; animation: cheerIn .4s ease-out; }
+  @keyframes cheerIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .cheer { animation: none; } }
+  .topline { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .info { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 6px 14px 6px 8px; border-radius: 22px; border: 2px solid var(--acc); color: var(--txt); font-weight: 700; font-size: 15px; background: transparent; }
+  .info span { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; background: var(--acc); color: #001018; font: italic 700 17px Georgia, serif; }
+  .overlay { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,0.65); display: flex; align-items: flex-end; justify-content: center; }
+  .sheet { width: 100%; max-width: 520px; max-height: 88vh; overflow-y: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 20px 20px 0 0; padding: 16px 16px 28px; }
+  .sheet-head { display: flex; align-items: center; justify-content: space-between; }
+  .sheet-head h2 { margin: 0; font-size: 20px; }
+  .x { width: 44px; height: 44px; font-size: 24px; background: transparent; border: 0; color: var(--txt); }
   .pause .cup { font-size: 72px; line-height: 1; margin: 12px 0 8px; }
   .pause h1 { font-size: 26px; }
   .pause p { font-size: 17px; line-height: 1.5; }
@@ -187,7 +198,7 @@
       <p class="dim">Zanemarite kosu, šminku i bradu — gledajte samo oblik glave. Uporedite širinu čela, jagodica i vilice
          (koja je najšira?), dužinu lica prema širini i oblik vilice i brade (uglasto ili zaobljeno, široko ili špicasto).</p>
       <h2>Oblici</h2>
-      <div class="legend">${SHAPES.map(([k, n, d]) => `<div>${icon(k, 40)}<span><b>${n}</b><br><span class="dim">${d}</span></span></div>`).join('')}</div>
+      ${legendHtml()}
       <h2>Vaše ime ili nadimak</h2>
       <input id="rater" type="text" maxlength="40" placeholder="npr. Ana" value="${esc(st.rater)}" autocomplete="off">
       <p class="dim">Samo da bismo razlikovali odgovore različitih ocenjivača.</p>
@@ -196,6 +207,42 @@
     const upd = () => { go.disabled = !inp.value.trim(); };
     inp.oninput = upd; upd();
     go.onclick = () => { st.rater = inp.value.trim(); st.idx = 0; save(); render(); };
+  }
+
+  // Podsetnik: opisi oblika u oblačiću preko ekrana (zatvara se na ✕, klik van ili Esc)
+  const legendHtml = () => `<div class="legend">${SHAPES.map(([k, n, d]) => `<div>${icon(k, 40)}<span><b>${n}</b><br><span class="dim">${d}</span></span></div>`).join('')}</div>`;
+  function openLegend() {
+    const opener = document.activeElement;
+    const ov = document.createElement('div');
+    ov.className = 'overlay';
+    ov.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="lg-t">
+        <div class="sheet-head"><h2 id="lg-t">Oblici lica</h2><button class="x" aria-label="Zatvori">✕</button></div>
+        <p class="dim">Zanemarite kosu, šminku i bradu — gledajte samo oblik glave.</p>
+        ${legendHtml()}
+      </div>`;
+    const close = () => { ov.remove(); document.removeEventListener('keydown', onKey); opener?.focus?.(); };
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+    ov.querySelector('.x').onclick = close;
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(ov);
+    ov.querySelector('.x').focus();
+  }
+
+  // Povremene reči ohrabrenja (na svakih 5 fotografija; posebne na pola, dve trećine i pred kraj)
+  const CHEERS = [
+    'Odlično ide! 👍', 'Imate dobro oko za ovo.', 'Svaka ocena nam mnogo znači — hvala!',
+    'Samo tako, lepo napredujete.', 'Sjajno! Vaš utisak je upravo ono što nam treba.',
+    'Bravo, idete kao podmazano.', 'Hvala na strpljenju — ovo je stvarno korisno.',
+  ];
+  function cheer(done, n) {
+    if (done <= 0 || done >= n) return '';
+    if (done === n - 5) return 'Skoro gotovo — još samo pet fotografija! 🏁';
+    if (done === Math.round(2 * n / 3)) return 'Dve trećine su za vama — još samo malo! 💪';
+    if (done === Math.round(n / 2)) return 'Pola puta je iza vas! 🎉';
+    if (done === Math.round(n / 3)) return '';
+    if (done % 5 === 0) return CHEERS[(done / 5 - 1) % CHEERS.length];
+    return '';
   }
 
   function renderPause() {
@@ -224,8 +271,12 @@
     };
     const answered = a.skip || a.sel.length > 0;
     app.innerHTML = `
-      <div class="dim">${demo ? 'PROBNA · ' : ''}Fotografija ${st.idx + 1} od ${n}</div>
+      <div class="topline">
+        <div class="dim">${demo ? 'PROBNA · ' : ''}Fotografija ${st.idx + 1} od ${n}</div>
+        <button class="info" id="info" aria-haspopup="dialog" aria-label="Podsetnik: opisi oblika"><span aria-hidden="true">i</span> Oblici</button>
+      </div>
       <div class="bar"><i style="width:${(st.idx / n) * 100}%"></i></div>
+      ${cheer(st.idx, n) ? `<div class="cheer" role="status">${cheer(st.idx, n)}</div>` : ''}
       <div class="photo"><img alt="Fotografija ${st.idx + 1}" src="${p.src}"></div>
       <div class="shapes">
         ${SHAPES.map(([k, nm]) => `<button class="shape${a.sel.includes(k) ? ' on' : ''}" data-k="${k}" aria-pressed="${a.sel.includes(k)}">
@@ -256,6 +307,7 @@
     const sw = app.querySelector('[data-swap]');
     if (sw) sw.onclick = () => { a.sel = [a.sel[1], a.sel[0]]; commit(); };
     document.getElementById('back').onclick = () => { st.idx -= 1; save(); render(); };
+    document.getElementById('info').onclick = openLegend;
     document.getElementById('next').onclick = () => {
       st.idx += 1;
       // Pauza posle trećine fotografija (jednom): pohvala i predah
