@@ -13,7 +13,7 @@
   h1 { font-size: 22px; margin: 8px 0 4px; }
   h2 { font-size: 17px; margin: 18px 0 8px; }
   p { margin: 8px 0; }
-  .dim { color: var(--dim); font-size: 14px; }
+  .dim { color: #c3c9d5; font-size: 15px; line-height: 1.5; }
   button { font: inherit; color: inherit; cursor: pointer; }
   .btn { display: block; width: 100%; padding: 14px; border-radius: 12px; border: 0; background: var(--acc); color: #001018; font-weight: 700; font-size: 16px; }
   .btn[disabled] { opacity: .35; cursor: default; }
@@ -21,9 +21,16 @@
   .row { display: flex; gap: 10px; margin-top: 12px; }
   .row > * { flex: 1; }
   input[type=text] { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--txt); font: inherit; }
-  .legend { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
-  .legend div { display: flex; gap: 8px; align-items: center; background: var(--panel); border-radius: 10px; padding: 8px; font-size: 13px; }
-  .legend svg { flex: 0 0 34px; }
+  .legend { display: flex; flex-direction: column; gap: 10px; }
+  .legend > div { display: flex; gap: 14px; align-items: center; background: var(--panel); border-radius: 12px; padding: 12px 14px; font-size: 16px; line-height: 1.45; }
+  .legend > div > span { flex: 1; }
+  .legend b { font-size: 17px; }
+  .legend .dim { font-size: 15px; color: #c3c9d5; }
+  .legend svg { flex: 0 0 40px; }
+  .pause { text-align: center; padding-top: 24px; }
+  .pause .cup { font-size: 72px; line-height: 1; margin: 12px 0 8px; }
+  .pause h1 { font-size: 26px; }
+  .pause p { font-size: 17px; line-height: 1.5; }
   .photo { width: 100%; aspect-ratio: 3 / 4; background: #0b0f17; border-radius: 14px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
   .photo img { width: 100%; height: 100%; object-fit: contain; }
   .bar { height: 6px; background: var(--panel); border-radius: 3px; overflow: hidden; margin: 6px 0 12px; }
@@ -155,6 +162,7 @@
   function render() {
     if (!photos.length) return renderEmpty();
     if (st.idx < 0) return renderIntro();
+    if (st.pause1 === 'show') return renderPause();
     if (st.idx >= st.order.length) return renderEnd();
     renderPhoto();
   }
@@ -179,7 +187,7 @@
       <p class="dim">Zanemarite kosu, šminku i bradu — gledajte samo oblik glave. Uporedite širinu čela, jagodica i vilice
          (koja je najšira?), dužinu lica prema širini i oblik vilice i brade (uglasto ili zaobljeno, široko ili špicasto).</p>
       <h2>Oblici</h2>
-      <div class="legend">${SHAPES.map(([k, n, d]) => `<div>${icon(k)}<span><b>${n}</b><br><span class="dim">${d}</span></span></div>`).join('')}</div>
+      <div class="legend">${SHAPES.map(([k, n, d]) => `<div>${icon(k, 40)}<span><b>${n}</b><br><span class="dim">${d}</span></span></div>`).join('')}</div>
       <h2>Vaše ime ili nadimak</h2>
       <input id="rater" type="text" maxlength="40" placeholder="npr. Ana" value="${esc(st.rater)}" autocomplete="off">
       <p class="dim">Samo da bismo razlikovali odgovore različitih ocenjivača.</p>
@@ -188,6 +196,21 @@
     const upd = () => { go.disabled = !inp.value.trim(); };
     inp.oninput = upd; upd();
     go.onclick = () => { st.rater = inp.value.trim(); st.idx = 0; save(); render(); };
+  }
+
+  function renderPause() {
+    const n = st.order.length;
+    const name = st.rater ? `, ${esc(st.rater)}` : '';
+    app.innerHTML = `
+      <div class="pause">
+        <div class="cup" aria-hidden="true">☕</div>
+        <h1>Bravo${name}! Trećina je za vama.</h1>
+        <p>Pregledali ste ${st.idx} od ${n} fotografija — to je već velika pomoć.</p>
+        <p>Zaslužili ste kaficu ili čaj. Počastite se, predahnite, pa nastavite kad budete spremni.
+           Vaši odgovori su sačuvani na ovom uređaju.</p>
+        <div class="row"><button class="btn" id="cont">Nastavi</button></div>
+      </div>`;
+    document.getElementById('cont').onclick = () => { st.pause1 = 'done'; save(); render(); window.scrollTo(0, 0); };
   }
 
   function renderPhoto() {
@@ -233,7 +256,12 @@
     const sw = app.querySelector('[data-swap]');
     if (sw) sw.onclick = () => { a.sel = [a.sel[1], a.sel[0]]; commit(); };
     document.getElementById('back').onclick = () => { st.idx -= 1; save(); render(); };
-    document.getElementById('next').onclick = () => { st.idx += 1; save(); render(); window.scrollTo(0, 0); };
+    document.getElementById('next').onclick = () => {
+      st.idx += 1;
+      // Pauza posle trećine fotografija (jednom): pohvala i predah
+      if (!st.pause1 && st.idx === Math.round(n / 3) && st.idx < n) { st.pause1 = 'show'; }
+      save(); render(); window.scrollTo(0, 0);
+    };
   }
 
   // Kod: OBLIK1;set;ime;id=oblik.procenat+oblik.procenat;id=?;...
