@@ -8,7 +8,7 @@ import { detectCardEdges, toGray, CARD_DETECT_MIN_CONFIDENCE } from './lib/cardD
 import { distanceFromCard, vfovPrior, parseVfovOverride } from './lib/cardDistance.js';
 import { estimateFaceDistance, distanceStatusMm, evaluateCard, aggregateBurst, DIST_BLOCK_MAX_MS, DIST_MAX_MM, DIST_MAX_ASSISTED_MM } from './lib/cardCheck.js';
 import { meanLuma, laplacianVariance, eyeForeheadRoi, MIN_LUMA, stillness } from './lib/captureGate.js';
-import { createVoice, STATUS_PROMPT, STATUS_PROMPT_ASSISTED, STATUS_HOLD_MS } from './lib/voice.js';
+import { createVoice, STATUS_PROMPT, STATUS_PROMPT_ASSISTED, STATUS_HOLD_MS, numberPromptIds } from './lib/voice.js';
 
 // Glasovne poruke koje opisuju trenutno stanje — na ekranu kamere ih već prikazuje veliki okvir stanja
 const STATUS_IDS = new Set([...Object.values(STATUS_PROMPT), ...Object.values(STATUS_PROMPT_ASSISTED)]);
@@ -420,6 +420,8 @@ const PDMeasurement = () => {
   const modeRef = useRef('self');
   const shotsRef = useRef([]); // asistirani režim: rezultati prethodnih snimaka (nezaokruženi PD + podaci za debug)
   const halfCanvasRef  = useRef(null);
+  const shakeSinceRef  = useRef(null);
+  const failCountRef   = useRef(0);  // koliko puta zaredom rezultat van opsega (→ G28)
   const burstRef       = useRef(null);  // { frames, prefill, ... } dok traje rafal pri snimku
   const captureDistanceRef = useRef(null); // udaljenost po MediaPipe-u (mm) — samo rezerva i debug
   const captureFrameRef    = useRef(null); // { vW, vH } frejma kamere pri snimku (za FOV → udaljenost iz kartice)
@@ -649,6 +651,11 @@ const PDMeasurement = () => {
       // Mirovanje: stabilna razmera i mala brzina (pomeranje lica po kadru zbog tremora je dozvoljeno)
       const still = stillness(hist, HISTORY_SIZE, cntdwnStartRef.current ? 1.5 : 1);
       const isStill = still.ok;
+      // Pokret prevelik duže od 1,5 s (a sve ostalo je u redu) → „Mirujte" / „Držite telefon mirno"
+      if (status === 'good' && !isStill && hist.length >= HISTORY_SIZE && !cntdwnStartRef.current) {
+        if (!shakeSinceRef.current) shakeSinceRef.current = now;
+        if (now - shakeSinceRef.current > 1500) setFaceStatus('shake');
+      } else shakeSinceRef.current = null;
 
       if (debug) {
         const tick = dbgTickRef.current, now = performance.now();
@@ -798,7 +805,15 @@ const PDMeasurement = () => {
 
   // Kartica nije prepoznata, a oznake su i dalje na proceni (koja pretpostavlja PD 63) → rezultat bi bio pretpostavka
   const cardUntouched = !cardAuto && !!cardPrefillRef.current && cardMarkers.length === 2
-    && cardMarkers.every((m, i) => distPx(m, cardPrefillRef.current[i]) < 2);
+    && cardMarkers.every((m, i) => distPx(m, cardPrefillRef.current[i]) < 0.5);
+
+  // „Merenje je završeno. Vaš rezultat je 62 i po." — iz delova, jedan titl
+  const announceResult = (v) => {
+    failCountRef.current = 0;
+    const num = numberPromptIds(v);
+    voice.enqueue(['G24']);
+    if (num) voice.sequence('rezultat', ['G25', ...num], `Vaš rezultat je ${formatPd(v)} mm.`);
+  };
 
   const calculatePD = () => {
     if (cardUntouched) { setError('Kartica nije prepoznata automatski. Pomerite obe crvene zagrade na levu i desnu ivicu kartice.'); return; }
@@ -863,7 +878,9 @@ const PDMeasurement = () => {
     if (pd < min || pd > max) {
       // Van opsega → korisnik ostaje na adjust koraku i popravlja markere. Bez tihog clamp-a.
       setError(`Vrednost (${formatPd(pd)} mm) je van opsega ${min}–${max} mm. Pomerite markere na ivice kartice i centre zenica, pa pokušajte ponovo.`);
+      failCountRef.current += 1;
       voice.say('G22', { interrupt: true }); play('error');
+      if (failCountRef.current >= 2) voice.enqueue(['G28']);
       return;
     }
     setError(null);
@@ -890,10 +907,12 @@ const PDMeasurement = () => {
         measurement: { ...rep.measurement, finalPdMm: final, shotPdMm: pd },
       });
       voice.stop(); play('success'); buzz(60);
+      announceResult(final);
       setFinalPD(final); setStep('result');
       return;
     }
     voice.stop(); play('success'); buzz(60);
+    announceResult(pd);
     setFinalPD(pd); setStep('result');
   };
 
@@ -951,6 +970,7 @@ const PDMeasurement = () => {
         try { window.parent.postMessage({ type: 'vizor:pd', pd: pdHalf }, origin); } catch {}
       }
       setSentToParent(true);
+      voice.stop(); voice.enqueue(['G26']);
       return;
     }
 
@@ -969,6 +989,7 @@ const PDMeasurement = () => {
       window.location.href = target.toString(); return;
     }
     setCopyOk(clipboardOk);
+    if (clipboardOk) { voice.stop(); voice.enqueue(['G27']); }
     setShowManualCopy(true);
   };
 
@@ -1078,6 +1099,7 @@ const PDMeasurement = () => {
       case 'card-high': return warn('Kartica je previsoko — spustite je iznad obrva');
       case 'card-off-face': return warn('Prislonite karticu uz čelo');
       case 'good': return { color: OK, icon: '✓', text: 'Odlično — mirujte' };
+      case 'shake': return warn(mode === 'assisted' ? 'Držite telefon mirno' : 'Mirujte — pokret je prevelik');
       default: return warn('Postavite lice u okvir');
     }
   })();

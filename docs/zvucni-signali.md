@@ -157,14 +157,19 @@ Koriste se kada korisnik izabere pisak umesto glasa, i za uspeh/grešku.
 - Zvučni efekti: Z01–Z04 — u kodu, ne snimaju se
 - **Ukupno: 99 glasovnih snimaka**
 
-## Status snimaka (2026-09-24)
+## Status snimaka (2026-09-30)
 
-Primljeno i obrađeno u `public/audio/` (AAC `.m4a`, mono, 48 kHz, 96 kbps; tišina skraćena na 0,05 s na početku
-i 0,25 s na kraju; glasnoća govora izjednačena na −19 dBFS RMS, vrh ≤ −1 dBFS):
-G01–G08, G10–G14, G18–G23 (19 fajlova).
+**Svi snimci su primljeni i povezani** (100 fajlova, `public/audio/<ID>.m4a`): G01–G14, G18–G29, G03A, P01–P07,
+N40–N80, N_IPO, O01–O08, O10–O11, O20–O26, O30–O36. Stari fajlovi iz prve serije su zamenjeni novim.
 
-**Nedostaje:** G09 („Ne vidim karticu. Prislonite je na čelo, iznad obrva, i držite je za gornju ivicu."), G03A („Držite je za gornju ivicu.") — potreban za proveru kartice uživo.
-**Snimiti ponovo:** G10 — tekst usklađen sa standardnim uputstvom „kartica na čelu, iznad obrva" (2026-09-25).
-**Prioritet za asistirani režim (zadnja kamera):** P01–P04, P06, P07 — već se prikazuju kao titl.
-**Sledeće serije:** G24–G28, P05, N40–N80, N_IPO.
-Originali ostaju kod Marka (master); u repozitorijumu su samo obrađene verzije.
+Obrada: tišina skraćena (0,05 s na početku, 0,25 s na kraju), glasnoća izjednačena na −19 dBFS RMS uz vrh ≤ −1 dBFS,
+AAC `.m4a`, mono, 48 kHz, 96 kbps, bez metapodataka. Originali ostaju kod Marka.
+
+Gde se koriste:
+- **Rezultat PD:** G24, pa rečenica iz delova G25 + broj (N40–N80) + N_IPO za pola milimetra — jedan titl
+  („Vaš rezultat je 62,5 mm."). Vrednost van 40–80,5 se ne izgovara (samo ispis).
+- **G26** posle upisa u konfigurator, **G27** posle kopiranja, **G28** posle drugog uzastopnog G22.
+- **P05 / G12:** pokret prevelik duže od 1,5 s (asistirani / samostalni režim).
+- **Oblik lica:** O01 na početku, O02–O07 po stanju, O08 posle 20 s, rezultat O10 + O2x (+ O11 + O3x).
+  Bez dodira ekrana pretraživač može da blokira zvuk — tada ostaje samo titl.
+- G15–G17 nisu potrebni (G14 je jedan snimak odbrojavanja).

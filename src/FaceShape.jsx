@@ -10,10 +10,14 @@ import { outlinePath, OUTLINE_PROFILE } from './lib/faceShapeOutlines.js';
 import { decomposeFacialMatrix, MAX_YAW_DEG } from './lib/headPose.js';
 import { distanceStatus } from './lib/captureGate.js';
 import { ALLOWED_ORIGINS, resolveReturnTarget } from './lib/returnTarget.js';
+import { createVoice, shapePromptIds } from './lib/voice.js';
+
+// Glas za stanje (titl već prikazuje ekran); O04/O05 = isti tekst kao PD G06/G07
+const STATUS_VOICE = { none: 'O02', pose: 'O03', far: 'O04', close: 'O05', edge: 'O06', good: 'O07' };
 
 const COLLECT_MS = 1500;      // potrebno trajanje dobrih (frontalnih) frejmova
 const CYCLE_MS = 200;         // smena obrisa tokom traženja (7 oblika ≈ 1,4 s)
-const RESULT_HOLD_MS = 1200;  // koliko se rezultat vidi pre povratka
+const RESULT_HOLD_MS = 3500;  // koliko se rezultat vidi (i izgovori) pre povratka
 const TIMEOUT_MS = 20000;     // posle ovoga: „Pokušajte ponovo"
 const MAX_PITCH_DEG = 8;      // strože nego za PD: nagib menja odnos visina/širina
 const ACCENT = '#00b8ff';
@@ -81,6 +85,12 @@ export default function FaceShape() {
   const [landmarker, setLandmarker] = useState(null);
   const [phase, setPhase] = useState('loading'); // loading | search | result | timeout | error
   const [caption, setCaption] = useState(TEXT.start);
+  // Glas: pušta se ako pretraživač dozvoli zvuk bez dodira (inače ostaje titl); titl vodi sam ekran
+  const voiceRef = useRef(null);
+  if (!voiceRef.current) voiceRef.current = createVoice({ baseUrl: `${import.meta.env.BASE_URL}audio/`, onCaption: () => {} });
+  const voice = voiceRef.current;
+  const statusTimer = useRef(null);
+  useEffect(() => () => { voice.stop(); clearTimeout(statusTimer.current); }, [voice]);
   const [result, setResult] = useState(null);     // { top, ranking, features }
   const [sent, setSent] = useState(false);
   const [err, setErr] = useState(null);
@@ -113,6 +123,7 @@ export default function FaceShape() {
       v.srcObject = stream;
       await new Promise(r => { v.onloadedmetadata = () => v.play().then(r).catch(r); });
       resetState(); setCaption(TEXT.start); setResult(null); setPhase('search');
+      voice.stop(); voice.enqueue(['O01']);
     } catch (e) {
       setErr(e?.name === 'NotAllowedError' ? 'Pristup kameri odbijen. Dozvolite pristup u podešavanjima pretraživača.' : 'Kamera nije dostupna.');
       setPhase('error');
@@ -183,7 +194,12 @@ export default function FaceShape() {
         }
       } catch { /* sledeći frejm */ }
 
-      if (status !== s.status) { s.status = status; setCaption(now - s.t0 < 1500 && status !== 'good' ? TEXT.start : TEXT[status]); }
+      if (status !== s.status) {
+        s.status = status; setCaption(now - s.t0 < 1500 && status !== 'good' ? TEXT.start : TEXT[status]);
+        clearTimeout(statusTimer.current);
+        const vid = STATUS_VOICE[status];
+        if (vid) statusTimer.current = setTimeout(() => voice.say(vid), status === 'good' ? 200 : 1000);
+      }
 
       if (s.goodMs >= COLLECT_MS && s.feats.length >= 10) {
         const features = medianFeatures(s.feats);
@@ -201,10 +217,13 @@ export default function FaceShape() {
         }
         setResult({ top, ranking, features });
         setCaption(`Vaš oblik lica: ${pct(top)}`);
+        clearTimeout(statusTimer.current); voice.stop();
+        const ids = shapePromptIds(top.oblik, top.drugi);
+        if (ids) voice.sequence('oblik', ids, `Vaš oblik lica: ${pct(top)}`);
         setPhase('result');
         return;
       }
-      if (now - s.t0 > TIMEOUT_MS) { stopCamera(); setPhase('timeout'); return; }
+      if (now - s.t0 > TIMEOUT_MS) { stopCamera(); clearTimeout(statusTimer.current); voice.stop(); voice.enqueue(['O08']); setPhase('timeout'); return; }
       rafRef.current = requestAnimationFrame(loop);
     };
     rafRef.current = requestAnimationFrame(loop);

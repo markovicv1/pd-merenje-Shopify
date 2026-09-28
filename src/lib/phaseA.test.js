@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { zoomRect, cardPrefill, rawPdFromMarkers, distPx } from './adjustGeometry.js';
 import { distanceStatus, meanLuma, laplacianVariance, eyeForeheadRoi } from './captureGate.js';
-import { shouldPlay, PROMPTS, STATUS_PROMPT, REPEAT_GAP_MS } from './voice.js';
+import fs from 'fs';
+import { shouldPlay, PROMPTS, STATUS_PROMPT, REPEAT_GAP_MS, numberPromptIds, shapePromptIds } from './voice.js';
 import { loadSettings, saveSettings, DEFAULT_SETTINGS } from './a11ySettings.js';
 
 const pupils = [{ x: 300, y: 400 }, { x: 420, y: 400 }]; // IPD 120 px
@@ -85,11 +86,24 @@ describe('voice.shouldPlay', () => {
     expect(shouldPlay({ id: 'G06', now: 10000, lastPlayedAt: { G06: 10000 - REPEAT_GAP_MS + 1 } })).toBe(false);
     expect(shouldPlay({ id: 'G06', now: 10000, lastPlayedAt: { G06: 10000 - REPEAT_GAP_MS } })).toBe(true);
   });
-  it('svaki status ima poruku sa tekstom i fajlom (ili null = samo titl, još nije snimljeno)', () => {
+  it('svaki status ima poruku sa tekstom i snimkom', () => {
     for (const id of Object.values(STATUS_PROMPT)) {
-      if (PROMPTS[id].file !== null) expect(PROMPTS[id].file).toMatch(/^G\d\d_/);
+      expect(PROMPTS[id].file).toBe(id);
       expect(PROMPTS[id].text.length).toBeGreaterThan(3);
     }
+  });
+  it('svaka poruka ima snimak u public/audio', () => {
+    for (const [id, p] of Object.entries(PROMPTS)) expect(fs.existsSync(`public/audio/${p.file}.m4a`), id).toBe(true);
+  });
+  it('izgovor broja', () => {
+    expect(numberPromptIds(62)).toEqual(['N62']);
+    expect(numberPromptIds(62.5)).toEqual(['N62', 'N_IPO']);
+    expect(numberPromptIds(80.5)).toEqual(['N80', 'N_IPO']);
+    expect(numberPromptIds(39.5)).toBeNull();
+  });
+  it('izgovor oblika lica', () => {
+    expect(shapePromptIds('oval', null)).toEqual(['O10', 'O20']);
+    expect(shapePromptIds('heart', 'diamond')).toEqual(['O10', 'O24', 'O11', 'O36']);
   });
 });
 
