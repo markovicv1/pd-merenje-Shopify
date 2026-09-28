@@ -262,3 +262,7 @@ Dopuna (isti tablet i osoba, zadnja kamera, udaljenost metrom):
   udaljenosti izmerene metrom — FOV se iz jednog snimka ne može izračunati (kartica i lice skaliraju isto).
 - Zaključak: FOV zadnje kamere zavisi od uređaja i pretraživača (Android tablet/stari telefon ~29–33°, iPhone ~53°).
   Za Android je potrebno još merenja sa udaljenošću izmerenom metrom. Uticaj na PD: 2× greška u udaljenosti ≈ 1 mm.
+- **Dopuna (Samsung):** udaljenost ~30 cm (procena). To bi značilo FOV ≈ 65° i rezultat 66,5 (+2,5 od reference 64),
+  a sa 29° je 64,5 (+0,5). Na snimku kartica nije ravno uz čelo (gornja ivica vidno duža od donje — zakrenuta)
+  i drži se prstima za bočnu ivicu, pa je širina kartice nepouzdana → snimak se ne koristi za kalibraciju.
+  Android prior ostaje 29°; potreban čist snimak (kartica ravno, držana za gornju ivicu, udaljenost metrom).
