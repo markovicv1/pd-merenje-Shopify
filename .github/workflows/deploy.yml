@@ -36,7 +36,10 @@ jobs:
         run: npm install
 
       - name: Build
-        run: npm run build
+        run: |
+          npm run build
+          # Anketa (šifrovane fotografije) postoji samo na test adresi, ne u produkciji
+          rm -rf dist/anketa
 
       # Test verzija na /pd-merenje-Shopify/test/ — ne utiče na produkciju; ako grana ne postoji, preskače se
       - name: Checkout test grane
