@@ -1236,7 +1236,7 @@ const PDMeasurement = () => {
               {IS_MOBILE ? (
                 <button className="btn-secondary" onClick={() => startMeasurement('assisted')} disabled={!faceMesh} style={{ flexDirection: 'column', gap: 0, padding: '11px 20px' }}>
                   <span style={{ fontWeight: 600 }}>Uz pomoć druge osobe</span>
-                  <span style={{ fontSize: 13, color: '#c3c9d5' }}>zadnja kamera · oko 2 minuta</span>
+                  <span style={{ fontSize: 13, color: '#c3c9d5' }}>korišćenjem zadnje kamere</span>
                 </button>
               ) : (
                 <p style={{ fontSize: 14, color: '#c3c9d5', textAlign: 'center', lineHeight: 1.45 }}>
