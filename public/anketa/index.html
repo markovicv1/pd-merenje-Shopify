@@ -93,6 +93,8 @@
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* bez pamćenja */ } },
     del(k) { try { localStorage.removeItem(k); } catch { /* ništa */ } },
   };
+  // 1 fotografiju / 2–4 fotografije / 5+ fotografija (11–14 → fotografija)
+  const fotoRec = (n) => (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)) ? 'fotografije' : n % 10 === 1 && n % 100 !== 11 ? 'fotografiju' : 'fotografija';
   const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 
@@ -111,7 +113,7 @@
     });
   }
 
-  let set = 'A', photos = [], key = '', st = null;
+  let set = 'A', photos = [], key = '', st = null, lockedMsg = '';
   const app = document.getElementById('app');
 
   async function init() {
@@ -120,8 +122,23 @@
       try {
         const m = await (await fetch('foto/manifest.json', { cache: 'no-store' })).json();
         set = m.set || 'A';
-        photos = (m.photos || []).map(p => ({ id: p.id, src: 'foto/' + p.src }));
-      } catch { photos = []; }
+        if (m.encrypted) {
+          // Fotografije su šifrovane (AES-GCM); ključ je samo u linku (#k=…) i ne šalje se serveru
+          const k = new URLSearchParams(location.hash.slice(1)).get('k');
+          if (!k) { lockedMsg = 'Link nije potpun. Otvorite ceo link koji ste dobili.'; photos = []; }
+          else {
+            const b64 = k.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((k.length + 3) % 4);
+            const raw = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+            const cryptoKey = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']);
+            const blob = new Uint8Array(await (await fetch('foto/paket.bin', { cache: 'no-store' })).arrayBuffer());
+            const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: blob.slice(0, 12) }, cryptoKey, blob.slice(12));
+            const pack = JSON.parse(new TextDecoder().decode(plain));
+            photos = pack.photos.map(p => ({ id: p.id, src: 'data:image/jpeg;base64,' + p.img }));
+          }
+        } else {
+          photos = (m.photos || []).map(p => ({ id: p.id, src: 'foto/' + p.src }));
+        }
+      } catch { photos = []; lockedMsg = lockedMsg || 'Fotografije nije moguće otvoriti. Proverite da li ste otvorili ceo link.'; }
     }
     key = 'oblik-anketa-' + set;
     st = store.get(key);
@@ -144,7 +161,7 @@
 
   function renderEmpty() {
     app.innerHTML = `<h1>Anketa: oblik lica</h1>
-      <p class="note">Fotografije za anketu još nisu dodate.</p>
+      <p class="note">${lockedMsg ? esc(lockedMsg) : 'Fotografije za anketu još nisu dodate.'}</p>
       <p class="dim">Tok ankete možete probati na šematskim licima:</p>
       <a class="btn" style="text-align:center;text-decoration:none" href="?demo=1">Probna anketa</a>`;
   }
@@ -153,7 +170,7 @@
     app.innerHTML = `
       ${demo ? '<p class="note">PROBNA ANKETA — šematska lica, samo za probu toka.</p>' : ''}
       <h1>Anketa: oblik lica</h1>
-      <p>Pomažete nam da naučimo aplikaciju da prepozna oblik lica. Videćete ${photos.length} fotografija;
+      <p>Pomažete nam da naučimo aplikaciju da prepozna oblik lica. Videćete ${photos.length} ${fotoRec(photos.length)};
          za svaku izaberite oblik koji vam se čini najbližim.</p>
       <p class="dim">Ako vam lice deluje kao spoj dva oblika, izaberite oba i odredite odnos (npr. 50/50).
          Ako ne možete da procenite, i to je odgovor. Nema tačnih i pogrešnih odgovora — zanima nas vaš utisak.

@@ -1,0 +1,510 @@
+{
+ "set": "A",
+ "note": "Featuri MediaPipe (legacy FaceMesh) na ise\u010denim fotografijama ankete; ID = oznaka u anketi.",
+ "features": {
+  "a01": {
+   "heightToWidth": 1.1893,
+   "foreheadToCheek": 0.908,
+   "jawToCheek": 0.8507,
+   "chinToJaw": 0.3544,
+   "jawAngleDeg": 142.3489,
+   "lowerThird": 0.3713
+  },
+  "a02": {
+   "heightToWidth": 1.1418,
+   "foreheadToCheek": 0.8665,
+   "jawToCheek": 0.8843,
+   "chinToJaw": 0.3658,
+   "jawAngleDeg": 137.6997,
+   "lowerThird": 0.3828
+  },
+  "a03": {
+   "heightToWidth": 1.1298,
+   "foreheadToCheek": 0.8779,
+   "jawToCheek": 0.8732,
+   "chinToJaw": 0.3704,
+   "jawAngleDeg": 138.6694,
+   "lowerThird": 0.3995
+  },
+  "a04": {
+   "heightToWidth": 1.2021,
+   "foreheadToCheek": 0.8548,
+   "jawToCheek": 0.8938,
+   "chinToJaw": 0.369,
+   "jawAngleDeg": 136.3966,
+   "lowerThird": 0.3985
+  },
+  "a05": {
+   "heightToWidth": 1.1327,
+   "foreheadToCheek": 0.9247,
+   "jawToCheek": 0.8467,
+   "chinToJaw": 0.3518,
+   "jawAngleDeg": 143.7447,
+   "lowerThird": 0.325
+  },
+  "a06": {
+   "heightToWidth": 1.161,
+   "foreheadToCheek": 0.8402,
+   "jawToCheek": 0.9309,
+   "chinToJaw": 0.3641,
+   "jawAngleDeg": 129.8903,
+   "lowerThird": 0.4123
+  },
+  "a07": {
+   "heightToWidth": 1.1541,
+   "foreheadToCheek": 0.8861,
+   "jawToCheek": 0.8609,
+   "chinToJaw": 0.3638,
+   "jawAngleDeg": 140.6473,
+   "lowerThird": 0.3683
+  },
+  "a08": {
+   "heightToWidth": 1.2016,
+   "foreheadToCheek": 0.8764,
+   "jawToCheek": 0.8974,
+   "chinToJaw": 0.3581,
+   "jawAngleDeg": 135.118,
+   "lowerThird": 0.392
+  },
+  "a09": {
+   "heightToWidth": 1.2435,
+   "foreheadToCheek": 0.8909,
+   "jawToCheek": 0.8709,
+   "chinToJaw": 0.368,
+   "jawAngleDeg": 137.5174,
+   "lowerThird": 0.3945
+  },
+  "a10": {
+   "heightToWidth": 1.3104,
+   "foreheadToCheek": 0.8531,
+   "jawToCheek": 0.8827,
+   "chinToJaw": 0.3671,
+   "jawAngleDeg": 140.4542,
+   "lowerThird": 0.4
+  },
+  "a11": {
+   "heightToWidth": 1.2447,
+   "foreheadToCheek": 0.8822,
+   "jawToCheek": 0.8556,
+   "chinToJaw": 0.3726,
+   "jawAngleDeg": 144.2456,
+   "lowerThird": 0.3811
+  },
+  "a12": {
+   "heightToWidth": 1.1314,
+   "foreheadToCheek": 0.8691,
+   "jawToCheek": 0.8591,
+   "chinToJaw": 0.3701,
+   "jawAngleDeg": 142.526,
+   "lowerThird": 0.386
+  },
+  "a13": {
+   "heightToWidth": 1.109,
+   "foreheadToCheek": 0.8734,
+   "jawToCheek": 0.8778,
+   "chinToJaw": 0.3404,
+   "jawAngleDeg": 136.5291,
+   "lowerThird": 0.3715
+  },
+  "a14": {
+   "heightToWidth": 1.1954,
+   "foreheadToCheek": 0.8972,
+   "jawToCheek": 0.8635,
+   "chinToJaw": 0.3567,
+   "jawAngleDeg": 141.8299,
+   "lowerThird": 0.3464
+  },
+  "a15": {
+   "heightToWidth": 1.2497,
+   "foreheadToCheek": 0.9129,
+   "jawToCheek": 0.8315,
+   "chinToJaw": 0.3866,
+   "jawAngleDeg": 147.9606,
+   "lowerThird": 0.3756
+  },
+  "a16": {
+   "heightToWidth": 1.2264,
+   "foreheadToCheek": 0.8463,
+   "jawToCheek": 0.8717,
+   "chinToJaw": 0.377,
+   "jawAngleDeg": 138.3436,
+   "lowerThird": 0.417
+  },
+  "a17": {
+   "heightToWidth": 1.1624,
+   "foreheadToCheek": 0.8642,
+   "jawToCheek": 0.8891,
+   "chinToJaw": 0.3737,
+   "jawAngleDeg": 136.2498,
+   "lowerThird": 0.3991
+  },
+  "a18": {
+   "heightToWidth": 1.1994,
+   "foreheadToCheek": 0.9364,
+   "jawToCheek": 0.8339,
+   "chinToJaw": 0.3883,
+   "jawAngleDeg": 146.3833,
+   "lowerThird": 0.3774
+  },
+  "a19": {
+   "heightToWidth": 1.1957,
+   "foreheadToCheek": 0.8845,
+   "jawToCheek": 0.8596,
+   "chinToJaw": 0.3784,
+   "jawAngleDeg": 143.6931,
+   "lowerThird": 0.3848
+  },
+  "a20": {
+   "heightToWidth": 1.1729,
+   "foreheadToCheek": 0.9289,
+   "jawToCheek": 0.8335,
+   "chinToJaw": 0.3451,
+   "jawAngleDeg": 146.3175,
+   "lowerThird": 0.3292
+  },
+  "a21": {
+   "heightToWidth": 1.1452,
+   "foreheadToCheek": 0.8622,
+   "jawToCheek": 0.8895,
+   "chinToJaw": 0.3787,
+   "jawAngleDeg": 134.9564,
+   "lowerThird": 0.4044
+  },
+  "a22": {
+   "heightToWidth": 1.2061,
+   "foreheadToCheek": 0.8993,
+   "jawToCheek": 0.8656,
+   "chinToJaw": 0.3804,
+   "jawAngleDeg": 142.9943,
+   "lowerThird": 0.3839
+  },
+  "a23": {
+   "heightToWidth": 1.1676,
+   "foreheadToCheek": 0.9338,
+   "jawToCheek": 0.831,
+   "chinToJaw": 0.3611,
+   "jawAngleDeg": 146.8904,
+   "lowerThird": 0.333
+  },
+  "a24": {
+   "heightToWidth": 1.2494,
+   "foreheadToCheek": 0.9108,
+   "jawToCheek": 0.8583,
+   "chinToJaw": 0.3597,
+   "jawAngleDeg": 142.6301,
+   "lowerThird": 0.3515
+  },
+  "a25": {
+   "heightToWidth": 1.1529,
+   "foreheadToCheek": 0.892,
+   "jawToCheek": 0.87,
+   "chinToJaw": 0.3666,
+   "jawAngleDeg": 138.9594,
+   "lowerThird": 0.3768
+  },
+  "a26": {
+   "heightToWidth": 1.2169,
+   "foreheadToCheek": 0.9584,
+   "jawToCheek": 0.8193,
+   "chinToJaw": 0.3705,
+   "jawAngleDeg": 150.8189,
+   "lowerThird": 0.3374
+  },
+  "a27": {
+   "heightToWidth": 1.2388,
+   "foreheadToCheek": 0.8791,
+   "jawToCheek": 0.8692,
+   "chinToJaw": 0.369,
+   "jawAngleDeg": 138.9127,
+   "lowerThird": 0.3868
+  },
+  "a28": {
+   "heightToWidth": 1.1808,
+   "foreheadToCheek": 0.8717,
+   "jawToCheek": 0.8812,
+   "chinToJaw": 0.3608,
+   "jawAngleDeg": 134.5309,
+   "lowerThird": 0.4054
+  },
+  "a29": {
+   "heightToWidth": 1.1546,
+   "foreheadToCheek": 0.8566,
+   "jawToCheek": 0.8895,
+   "chinToJaw": 0.3552,
+   "jawAngleDeg": 138.5777,
+   "lowerThird": 0.3637
+  },
+  "a30": {
+   "heightToWidth": 1.2366,
+   "foreheadToCheek": 0.88,
+   "jawToCheek": 0.888,
+   "chinToJaw": 0.3553,
+   "jawAngleDeg": 141.8736,
+   "lowerThird": 0.3564
+  },
+  "a31": {
+   "heightToWidth": 1.1884,
+   "foreheadToCheek": 0.8442,
+   "jawToCheek": 0.9252,
+   "chinToJaw": 0.3666,
+   "jawAngleDeg": 131.7086,
+   "lowerThird": 0.4151
+  },
+  "a32": {
+   "heightToWidth": 1.1841,
+   "foreheadToCheek": 0.8729,
+   "jawToCheek": 0.8836,
+   "chinToJaw": 0.37,
+   "jawAngleDeg": 141.4677,
+   "lowerThird": 0.3719
+  },
+  "a33": {
+   "heightToWidth": 1.2474,
+   "foreheadToCheek": 0.8727,
+   "jawToCheek": 0.8853,
+   "chinToJaw": 0.3754,
+   "jawAngleDeg": 138.5259,
+   "lowerThird": 0.4257
+  },
+  "a34": {
+   "heightToWidth": 1.1818,
+   "foreheadToCheek": 0.9115,
+   "jawToCheek": 0.836,
+   "chinToJaw": 0.3572,
+   "jawAngleDeg": 145.0148,
+   "lowerThird": 0.3509
+  },
+  "a35": {
+   "heightToWidth": 1.1795,
+   "foreheadToCheek": 0.8477,
+   "jawToCheek": 0.9083,
+   "chinToJaw": 0.368,
+   "jawAngleDeg": 133.7625,
+   "lowerThird": 0.4234
+  },
+  "a36": {
+   "heightToWidth": 1.2414,
+   "foreheadToCheek": 0.847,
+   "jawToCheek": 0.8897,
+   "chinToJaw": 0.3441,
+   "jawAngleDeg": 136.8982,
+   "lowerThird": 0.3762
+  },
+  "a37": {
+   "heightToWidth": 1.1848,
+   "foreheadToCheek": 0.8503,
+   "jawToCheek": 0.8979,
+   "chinToJaw": 0.3653,
+   "jawAngleDeg": 134.9277,
+   "lowerThird": 0.4158
+  },
+  "a38": {
+   "heightToWidth": 1.207,
+   "foreheadToCheek": 0.8763,
+   "jawToCheek": 0.8888,
+   "chinToJaw": 0.3589,
+   "jawAngleDeg": 139.5746,
+   "lowerThird": 0.3503
+  },
+  "a39": {
+   "heightToWidth": 1.2277,
+   "foreheadToCheek": 0.8975,
+   "jawToCheek": 0.8666,
+   "chinToJaw": 0.3705,
+   "jawAngleDeg": 142.6223,
+   "lowerThird": 0.3889
+  },
+  "a40": {
+   "heightToWidth": 1.3053,
+   "foreheadToCheek": 0.8734,
+   "jawToCheek": 0.9109,
+   "chinToJaw": 0.3888,
+   "jawAngleDeg": 140.4172,
+   "lowerThird": 0.3967
+  },
+  "a41": {
+   "heightToWidth": 1.2409,
+   "foreheadToCheek": 0.9172,
+   "jawToCheek": 0.8481,
+   "chinToJaw": 0.3772,
+   "jawAngleDeg": 148.0544,
+   "lowerThird": 0.352
+  },
+  "a42": {
+   "heightToWidth": 1.1957,
+   "foreheadToCheek": 0.8518,
+   "jawToCheek": 0.8768,
+   "chinToJaw": 0.3653,
+   "jawAngleDeg": 139.8497,
+   "lowerThird": 0.3866
+  },
+  "a43": {
+   "heightToWidth": 1.1944,
+   "foreheadToCheek": 0.8697,
+   "jawToCheek": 0.8924,
+   "chinToJaw": 0.3861,
+   "jawAngleDeg": 134.1016,
+   "lowerThird": 0.4362
+  },
+  "a44": {
+   "heightToWidth": 1.2123,
+   "foreheadToCheek": 0.8726,
+   "jawToCheek": 0.8932,
+   "chinToJaw": 0.3739,
+   "jawAngleDeg": 138.0765,
+   "lowerThird": 0.3995
+  },
+  "a45": {
+   "heightToWidth": 1.1478,
+   "foreheadToCheek": 0.8994,
+   "jawToCheek": 0.8379,
+   "chinToJaw": 0.3596,
+   "jawAngleDeg": 144.6052,
+   "lowerThird": 0.4129
+  },
+  "a46": {
+   "heightToWidth": 1.2015,
+   "foreheadToCheek": 0.8387,
+   "jawToCheek": 0.8943,
+   "chinToJaw": 0.3541,
+   "jawAngleDeg": 135.513,
+   "lowerThird": 0.3804
+  },
+  "a47": {
+   "heightToWidth": 1.179,
+   "foreheadToCheek": 0.8817,
+   "jawToCheek": 0.8765,
+   "chinToJaw": 0.3719,
+   "jawAngleDeg": 139.1105,
+   "lowerThird": 0.382
+  },
+  "a48": {
+   "heightToWidth": 1.1624,
+   "foreheadToCheek": 0.9158,
+   "jawToCheek": 0.8469,
+   "chinToJaw": 0.3627,
+   "jawAngleDeg": 141.879,
+   "lowerThird": 0.3742
+  },
+  "a49": {
+   "heightToWidth": 1.2282,
+   "foreheadToCheek": 0.8694,
+   "jawToCheek": 0.865,
+   "chinToJaw": 0.3502,
+   "jawAngleDeg": 139.8466,
+   "lowerThird": 0.4011
+  },
+  "a50": {
+   "heightToWidth": 1.2068,
+   "foreheadToCheek": 0.8745,
+   "jawToCheek": 0.8872,
+   "chinToJaw": 0.387,
+   "jawAngleDeg": 138.6787,
+   "lowerThird": 0.4008
+  },
+  "a51": {
+   "heightToWidth": 1.2509,
+   "foreheadToCheek": 0.8992,
+   "jawToCheek": 0.8838,
+   "chinToJaw": 0.3917,
+   "jawAngleDeg": 140.3306,
+   "lowerThird": 0.404
+  },
+  "a52": {
+   "heightToWidth": 1.2356,
+   "foreheadToCheek": 0.9008,
+   "jawToCheek": 0.8763,
+   "chinToJaw": 0.3854,
+   "jawAngleDeg": 143.1168,
+   "lowerThird": 0.3755
+  },
+  "a53": {
+   "heightToWidth": 1.2603,
+   "foreheadToCheek": 0.8706,
+   "jawToCheek": 0.8885,
+   "chinToJaw": 0.391,
+   "jawAngleDeg": 142.707,
+   "lowerThird": 0.3743
+  },
+  "a54": {
+   "heightToWidth": 1.2267,
+   "foreheadToCheek": 0.8993,
+   "jawToCheek": 0.8409,
+   "chinToJaw": 0.3604,
+   "jawAngleDeg": 141.3273,
+   "lowerThird": 0.3739
+  },
+  "a55": {
+   "heightToWidth": 1.234,
+   "foreheadToCheek": 0.8748,
+   "jawToCheek": 0.8766,
+   "chinToJaw": 0.376,
+   "jawAngleDeg": 139.3723,
+   "lowerThird": 0.4031
+  },
+  "a56": {
+   "heightToWidth": 1.2126,
+   "foreheadToCheek": 0.8506,
+   "jawToCheek": 0.9029,
+   "chinToJaw": 0.3836,
+   "jawAngleDeg": 136.7168,
+   "lowerThird": 0.4256
+  },
+  "a57": {
+   "heightToWidth": 1.3166,
+   "foreheadToCheek": 0.8729,
+   "jawToCheek": 0.8687,
+   "chinToJaw": 0.3735,
+   "jawAngleDeg": 145.5333,
+   "lowerThird": 0.364
+  },
+  "a58": {
+   "heightToWidth": 1.2201,
+   "foreheadToCheek": 0.8689,
+   "jawToCheek": 0.8785,
+   "chinToJaw": 0.3721,
+   "jawAngleDeg": 137.647,
+   "lowerThird": 0.4018
+  },
+  "a59": {
+   "heightToWidth": 1.2461,
+   "foreheadToCheek": 0.8708,
+   "jawToCheek": 0.8869,
+   "chinToJaw": 0.3875,
+   "jawAngleDeg": 139.8367,
+   "lowerThird": 0.393
+  },
+  "a60": {
+   "heightToWidth": 1.1566,
+   "foreheadToCheek": 0.8781,
+   "jawToCheek": 0.8764,
+   "chinToJaw": 0.3706,
+   "jawAngleDeg": 142.1032,
+   "lowerThird": 0.3708
+  },
+  "a61": {
+   "heightToWidth": 1.2513,
+   "foreheadToCheek": 0.8787,
+   "jawToCheek": 0.8967,
+   "chinToJaw": 0.3741,
+   "jawAngleDeg": 138.9244,
+   "lowerThird": 0.3879
+  },
+  "a62": {
+   "heightToWidth": 1.1821,
+   "foreheadToCheek": 0.8604,
+   "jawToCheek": 0.9027,
+   "chinToJaw": 0.3791,
+   "jawAngleDeg": 135.4849,
+   "lowerThird": 0.418
+  },
+  "a63": {
+   "heightToWidth": 1.198,
+   "foreheadToCheek": 0.9273,
+   "jawToCheek": 0.8297,
+   "chinToJaw": 0.3731,
+   "jawAngleDeg": 148.5277,
+   "lowerThird": 0.3387
+  }
+ }
+}
