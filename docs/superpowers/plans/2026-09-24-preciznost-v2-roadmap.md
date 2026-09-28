@@ -244,3 +244,21 @@ Dopuna (isti tablet i osoba, zadnja kamera, udaljenost metrom):
   Prednja: 64,5 (+1,5). Jedna osoba, referenca približna — konstante se ne menjaju.
 - FOV tableta iz sva 4 merenja: 28,5° → prior zadnje kamere 29° (portret 38°).
 - Predlog: dva snimka zaredom i prosek (smanjuje rasipanje ~1,4×).
+
+### Zadnja kamera — iPhone i Samsung (2026-09-28)
+
+| Uređaj / kamera | Referentni PD | Kartica (ručno) | Sirovi | Udalj. po kartici | MediaPipe | Rezultat |
+|---|---|---|---|---|---|---|
+| iPhone (iOS 26, Chrome), „Back Dual Wide Camera" | — | 209,8 px | 60,84 | 858 mm (29°) | 417 mm | 62,0 |
+| Samsung (Android 10, Samsung Internet), „camera 2, facing back" | 64 | 246,4 px | 63,00 | 731 mm (29°) | 362 mm | 64,5 (+0,5) |
+
+- **Automatsko prepoznavanje kartice nije uspelo ni na jednom snimku** (conf 0,4), oznake su postavljene ručno.
+  Samsung: prsti drže karticu za bočnu ivicu (rafal 233 / 285 / 285 px — prst uključen u širinu);
+  iPhone: kartica mala (210 px) i svetla na svetloj kosi.
+- **iPhone:** FOV 29° je pogrešan za iPhone — kartica daje 86 cm, a MediaPipe i kadar ~42–44 cm. iPhone isporučuje pun
+  4:3 senzor glavne kamere (26 mm ekv.) → kraća strana ≈ 53°, duža ≈ 67°. Uveden poseban prior za iOS zadnju kameru;
+  isti snimak: 448 mm → 63,0 (umesto 62,0). Referentni PD nije poznat.
+- **Samsung:** sa 29° rezultat 64,5 (+0,5 od reference). Da li je FOV i ovde širi (pun senzor), ne može se znati bez
+  udaljenosti izmerene metrom — FOV se iz jednog snimka ne može izračunati (kartica i lice skaliraju isto).
+- Zaključak: FOV zadnje kamere zavisi od uređaja i pretraživača (Android tablet/stari telefon ~29–33°, iPhone ~53°).
+  Za Android je potrebno još merenja sa udaljenošću izmerenom metrom. Uticaj na PD: 2× greška u udaljenosti ≈ 1 mm.

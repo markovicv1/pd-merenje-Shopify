@@ -11,9 +11,12 @@ import { CARD_WIDTH_MM, CARD_DEPTH_OFFSET_MM } from './pdMath.js';
 // Kalibracija (2026-09-25): Android tablet, udaljenost merena metrom 65/60/40/60 cm → 29,2°/30,2°/27,7°/27,0°
 // (prosek 28,5°); stari Android telefon, udaljenost procenjena ~55 cm → 33,5°. Uzeto 29° (merenja metrom imaju prednost).
 // Uticaj na PD je mali: greška udaljenosti od 10% na 60 cm menja rezultat za ~0,2 mm.
-export const VFOV_PRIOR = { phonePortrait: 70, phoneLandscape: 55, desktop: 45, rearPortrait: 38, rearLandscape: 29 };
+// iPhone zadnja („Back Dual Wide Camera"): pun 4:3 senzor, 26 mm ekv. → kraća strana ≈ 53°, duža ≈ 67°.
+// Potvrđeno 2026-09-28: sa 29° kartica je davala 86 cm, a MediaPipe i kadar ~42–44 cm; sa 53° → 44 cm.
+export const VFOV_PRIOR = { phonePortrait: 70, phoneLandscape: 55, desktop: 45, rearPortrait: 38, rearLandscape: 29, iosRearPortrait: 67, iosRearLandscape: 53 };
 
-export function vfovPrior({ mobile, frameW, frameH, rear = false }) {
+export function vfovPrior({ mobile, frameW, frameH, rear = false, ios = false }) {
+  if (mobile && rear && ios) return frameH >= frameW ? VFOV_PRIOR.iosRearPortrait : VFOV_PRIOR.iosRearLandscape;
   if (mobile && rear) return frameH >= frameW ? VFOV_PRIOR.rearPortrait : VFOV_PRIOR.rearLandscape;
   if (mobile) return frameH >= frameW ? VFOV_PRIOR.phonePortrait : VFOV_PRIOR.phoneLandscape;
   return VFOV_PRIOR.desktop;

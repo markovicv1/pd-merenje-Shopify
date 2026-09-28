@@ -124,3 +124,17 @@ Definicije u anketi usklađene sa ovim izvorima (šta je najšire, dužina/širi
 Kandidat za novi feature: **dužina donje trećine** (subnazale → brada, landmark 2 → 152, prema dužini lica) —
 razlikuje duguljasto/pravougaono i srcoliko (kratka donja trećina). Uvesti tek uz podatke iz ankete.
 Ograničenje ostaje: MediaPipe tačka 10 je ispod linije kose, a izvori mere dužinu od linije kose.
+
+## 10. Anketa — stanje (2026-09-28)
+
+- Paket: 63 fotografije (od 75 dostavljenih; 12 izostavljeno), šifrovano; ključ samo u linku za testere.
+  Featuri po ID-ju: `docs/oblik-lica-anketa-featuri.json` (sadrži i novi `lowerThird`). Odgovori: `docs/oblik-lica-anketa/odgovori.txt`.
+- Dodato u anketu: podsetnik opisa oblika (dugme „i Oblici"), pauza posle trećine, povremene reči ohrabrenja,
+  upozorenje na kraju da se odgovori moraju proslediti.
+- **2 ocenjivača** (Vladimir 63, Deki 58 ocena):
+  - slaganje ocenjivača: isti glavni oblik 41 %, bar jedan zajednički oblik 52 %, preklapanje raspodela 38 %;
+  - model (privremena kalibracija) prema ocenjivačima: #1 u oceni 25–29 %, #1 ili #2: 43–50 %
+    (nasumično ≈ 14 % / 28 %).
+  - Slaganje ljudi (41 %) je realna gornja granica — potvrđuje da su oblici subjektivni; cilj je da se model približi tome.
+  - Trouglasto je retko (1,5 i 4 glavna izbora) — možda dodati fotografije lica sa širokom vilicom.
+- Potrebno: najmanje 5, idealno 8–10 ocenjivača, pa kalibracija prototipova na prosečnoj oceni.

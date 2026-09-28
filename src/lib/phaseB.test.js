@@ -54,6 +54,9 @@ describe('cardDistance (B4)', () => {
     expect(vfovPrior({ mobile: true, frameW: 1080, frameH: 1440 })).toBe(VFOV_PRIOR.phonePortrait);
     expect(vfovPrior({ mobile: true, frameW: 1440, frameH: 1080 })).toBe(VFOV_PRIOR.phoneLandscape);
     expect(vfovPrior({ mobile: false, frameW: 1080, frameH: 1440 })).toBe(VFOV_PRIOR.desktop);
+    expect(vfovPrior({ mobile: true, rear: true, frameW: 1440, frameH: 1080 })).toBe(VFOV_PRIOR.rearLandscape);
+    expect(vfovPrior({ mobile: true, rear: true, ios: true, frameW: 1440, frameH: 1080 })).toBe(VFOV_PRIOR.iosRearLandscape);
+    expect(vfovPrior({ mobile: true, rear: false, ios: true, frameW: 1440, frameH: 1080 })).toBe(VFOV_PRIOR.phoneLandscape);
   });
   it('nevalidni ulazi → NaN', () => {
     expect(distanceFromCard({ cardPx: 0, frameH: 1440, vfovDeg: 45 })).toBeNaN();

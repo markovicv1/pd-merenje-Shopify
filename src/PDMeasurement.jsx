@@ -142,8 +142,10 @@ const IS_MOBILE = typeof navigator !== 'undefined' && (
   || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
   || (navigator.maxTouchPoints > 1 && typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches)
 );
+const IS_IOS = typeof navigator !== 'undefined'
+  && (/iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1));
 const vfovFor = (frameW, frameH, rear = false) =>
-  parseVfovOverride(window.location.search) ?? vfovPrior({ mobile: IS_MOBILE, frameW, frameH, rear });
+  parseVfovOverride(window.location.search) ?? vfovPrior({ mobile: IS_MOBILE, frameW, frameH, rear, ios: IS_IOS });
 
 // Očekivani položaj kartice (za obris na ekranu): na čelu, iznad obrva
 function drawCardGuide(ctx, l, r, ok, k = 1) {
