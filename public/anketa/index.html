@@ -48,13 +48,13 @@
 (() => {
   // ── Oblici lica (isti ključevi i obrisi kao u aplikaciji — src/lib/faceShape.js) ──
   const SHAPES = [
-    ['oval', 'Ovalno', 'duže nego šire, blago zaobljeno, čelo malo šire od brade'],
-    ['round', 'Okruglo', 'širina ≈ visina, meke linije, puni obrazi'],
-    ['oblong', 'Duguljasto', 'znatno duže nego šire, ravne strane'],
-    ['square', 'Četvrtasto', 'široka, uglasta vilica, čelo ≈ vilica'],
-    ['heart', 'Srcoliko', 'široko čelo, uska i špicasta brada'],
-    ['triangle', 'Trouglasto', 'usko čelo, široka vilica'],
-    ['diamond', 'Dijamantsko', 'najšire u jagodicama, usko čelo i brada'],
+    ['oval', 'Ovalno', 'duže nego šire; najšire u jagodicama; čelo malo šire od vilice; brada blago zaobljena'],
+    ['round', 'Okruglo', 'dužina ≈ širina; puni obrazi; zaobljena vilica bez uglova'],
+    ['oblong', 'Duguljasto', 'znatno duže nego šire; čelo, jagodice i vilica slične širine; ravne strane'],
+    ['square', 'Četvrtasto', 'dužina ≈ širina; čelo, jagodice i vilica slične širine; uglasta, ravna vilica'],
+    ['heart', 'Srcoliko', 'najšire u čelu; lice se sužava ka maloj ili špicastoj bradi'],
+    ['triangle', 'Trouglasto', 'najšire u vilici; čelo primetno uže od vilice'],
+    ['diamond', 'Dijamantsko', 'najšire u jagodicama; i čelo i brada uski; brada fina ili špicasta'],
   ];
   const NAME = Object.fromEntries(SHAPES.map(s => [s[0], s[1]]));
   // Polu-širine na visinama Y (viewBox 100×130), vrh čela i brada
@@ -158,6 +158,9 @@
       <p class="dim">Ako vam lice deluje kao spoj dva oblika, izaberite oba i odredite odnos (npr. 50/50).
          Ako ne možete da procenite, i to je odgovor. Nema tačnih i pogrešnih odgovora — zanima nas vaš utisak.
          Anketa traje oko ${Math.max(2, Math.round(photos.length * 12 / 60))} minuta; napredak se čuva na ovom uređaju.</p>
+      <h2>Kako procenjujete</h2>
+      <p class="dim">Zanemarite kosu, šminku i bradu — gledajte samo oblik glave. Uporedite širinu čela, jagodica i vilice
+         (koja je najšira?), dužinu lica prema širini i oblik vilice i brade (uglasto ili zaobljeno, široko ili špicasto).</p>
       <h2>Oblici</h2>
       <div class="legend">${SHAPES.map(([k, n, d]) => `<div>${icon(k)}<span><b>${n}</b><br><span class="dim">${d}</span></span></div>`).join('')}</div>
       <h2>Vaše ime ili nadimak</h2>

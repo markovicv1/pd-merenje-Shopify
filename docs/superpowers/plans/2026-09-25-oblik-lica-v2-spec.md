@@ -109,3 +109,18 @@ Prototipovi su preslikani na ovu raspodelu (relativni odnosi među oblicima zadr
 Raspodela rezultata na istim snimcima: ovalno 27, trouglasto 7, duguljasto 3, okruglo 2, dijamantsko 1 (od 40);
 ista osoba na 10 snimaka dosledno dobija isti oblik. Konačna kalibracija — iz ankete.
 Napomena: na snimcima PD testera kartica je na čelu, što može pomeriti tačke čela.
+
+## 9. Izvori definicija oblika (2026-09-28)
+
+Pregledano (saveti o frizuri i ulepšavanju zanemareni):
+- hitchhack.com — „Face Shape Styling System 2026": 9 oblika (pored naših 7 i *obrnuti trougao* i *pravougaono*).
+  Obrnuti trougao ≈ srcoliko (čelo najšire), pravougaono ≈ duguljasto (razlika: dužina donje trećine lica).
+  Razlika dijamant / obrnuti trougao: čelo **uže** od jagodica → dijamant; čelo ≥ jagodice → obrnuti trougao.
+  Merenje: kosa sklonjena, poređenje širine čela, jagodica, vilice i dužine od linije kose do brade.
+- thebeautydeeplife.com — 7 oblika (isti kao naši; „long" = duguljasto).
+
+Odluka: ostaje **7 oblika** (oba izvora ih pokrivaju; 9 bi prepolovilo broj ocena po obliku).
+Definicije u anketi usklađene sa ovim izvorima (šta je najšire, dužina/širina, vilica i brada).
+Kandidat za novi feature: **dužina donje trećine** (subnazale → brada, landmark 2 → 152, prema dužini lica) —
+razlikuje duguljasto/pravougaono i srcoliko (kratka donja trećina). Uvesti tek uz podatke iz ankete.
+Ograničenje ostaje: MediaPipe tačka 10 je ispod linije kose, a izvori mere dužinu od linije kose.
